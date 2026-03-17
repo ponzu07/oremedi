@@ -1,0 +1,16 @@
+services:
+  oremedi:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - /volume1/media:/media:ro
+      - /volume1/media-converted:/media-converted
+      - ./data:/data
+    environment:
+      - PASSWORD_HASH=${PASSWORD_HASH}
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/data/oremedi.db
+      - MEDIA_PATH=/media
+      - CONVERTED_PATH=/media-converted
+    restart: unless-stopped
