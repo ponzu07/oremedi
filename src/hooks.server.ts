@@ -2,10 +2,27 @@ import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { verifyToken } from '$lib/server/auth';
 import { config } from '$lib/server/config';
+import { getDb } from '$lib/server/database';
+import { startTranscodeWorker } from '$lib/server/transcoder';
 
 const PUBLIC_PATHS = ['/login', '/api/auth/login'];
 
+// Start transcode worker on server startup
+let workerStarted = false;
+function ensureWorker() {
+	if (workerStarted) return;
+	workerStarted = true;
+	try {
+		const db = getDb();
+		startTranscodeWorker(db, config.convertedPath);
+	} catch {
+		// Worker will retry on next request
+		workerStarted = false;
+	}
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
+	ensureWorker();
 	const { pathname } = event.url;
 
 	if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
