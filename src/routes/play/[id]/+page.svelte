@@ -1,13 +1,25 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import CastButton from '$lib/components/CastButton.svelte';
+	import {
+		downloadMedia,
+		getDownloadedMediaUrl,
+		getDownloadedMedia,
+		formatSize
+	} from '$lib/download-manager';
 
 	let { data }: { data: PageData } = $props();
 	const media = data.media;
 
 	const isVideo = ['movie', 'live_video'].includes(media.category as string);
-	const streamUrl = `/api/media/${media.id}/stream`;
-	const downloadUrl = `/api/media/${media.id}/download`;
+	const onlineStreamUrl = `/api/media/${media.id}/stream`;
+
+	let mediaUrl = $state(onlineStreamUrl);
+	let isOffline = $state(false);
+	let isDownloaded = $state(false);
+	let downloading = $state(false);
+	let downloadProgress = $state(0);
 
 	const categoryLabels: Record<string, string> = {
 		movie: 'Movie',
@@ -15,6 +27,43 @@
 		voice: 'Voice',
 		music: 'Music'
 	};
+
+	onMount(async () => {
+		// Check if already downloaded
+		const existing = await getDownloadedMedia(media.id as number);
+		if (existing) {
+			isDownloaded = true;
+		}
+
+		// If offline, use downloaded version
+		if (!navigator.onLine && existing) {
+			const url = await getDownloadedMediaUrl(media.id as number);
+			if (url) {
+				mediaUrl = url;
+				isOffline = true;
+			}
+		}
+	});
+
+	async function handleDownload() {
+		downloading = true;
+		downloadProgress = 0;
+		try {
+			await downloadMedia(
+				media.id as number,
+				media.title as string,
+				media.category as string,
+				(loaded, total) => {
+					downloadProgress = total > 0 ? (loaded / total) * 100 : 0;
+				}
+			);
+			isDownloaded = true;
+		} catch (err) {
+			console.error('Download failed:', err);
+			alert('Download failed');
+		}
+		downloading = false;
+	}
 </script>
 
 <div class="player-page">
@@ -25,7 +74,7 @@
 	<div class="player-container">
 		{#if isVideo}
 			<!-- svelte-ignore a11y_media_has_caption -->
-			<video controls autoplay preload="metadata" src={streamUrl}>
+			<video controls autoplay preload="metadata" src={mediaUrl}>
 				Your browser does not support the video tag.
 			</video>
 		{:else}
@@ -37,7 +86,7 @@
 						<div class="placeholder-art">&#9835;</div>
 					{/if}
 				</div>
-				<audio controls autoplay preload="metadata" src={streamUrl}>
+				<audio controls autoplay preload="metadata" src={mediaUrl}>
 					Your browser does not support the audio tag.
 				</audio>
 			</div>
@@ -65,9 +114,24 @@
 			</dl>
 		{/if}
 
+		{#if isOffline}
+			<div class="offline-badge">Offline playback</div>
+		{/if}
+
 		<div class="actions">
 			<CastButton mediaId={media.id as number} title={media.title as string} {isVideo} />
-			<a href={downloadUrl} class="btn" download>Download</a>
+			{#if downloading}
+				<div class="download-progress">
+					<div class="progress-bar">
+						<div class="progress-fill" style="width: {downloadProgress}%"></div>
+					</div>
+					<span>{Math.round(downloadProgress)}%</span>
+				</div>
+			{:else if isDownloaded}
+				<span class="downloaded-badge">Downloaded</span>
+			{:else}
+				<button class="btn" onclick={handleDownload}>Save Offline</button>
+			{/if}
 		</div>
 	</div>
 </div>
@@ -191,5 +255,52 @@
 
 	.btn:hover {
 		background: #444;
+	}
+
+	button.btn {
+		padding: 0.5rem 1.5rem;
+		background: #333;
+		color: #fff;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 1rem;
+	}
+
+	.offline-badge {
+		display: inline-block;
+		padding: 0.25rem 0.75rem;
+		background: #2a2a1a;
+		color: #aa8;
+		border-radius: 4px;
+		font-size: 0.8rem;
+		margin-top: 0.75rem;
+	}
+
+	.downloaded-badge {
+		color: #4a4;
+		font-size: 0.875rem;
+	}
+
+	.download-progress {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex: 1;
+		max-width: 200px;
+	}
+
+	.progress-bar {
+		flex: 1;
+		height: 6px;
+		background: #222;
+		border-radius: 3px;
+		overflow: hidden;
+	}
+
+	.progress-fill {
+		height: 100%;
+		background: #4a9eff;
+		transition: width 0.2s;
 	}
 </style>
