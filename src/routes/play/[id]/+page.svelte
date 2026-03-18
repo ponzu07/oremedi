@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import CastButton from '$lib/components/CastButton.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const media = data.media;
@@ -65,6 +66,7 @@
 		{/if}
 
 		<div class="actions">
+			<CastButton mediaId={media.id as number} title={media.title as string} {isVideo} />
 			<a href={downloadUrl} class="btn" download>Download</a>
 		</div>
 	</div>
@@ -172,6 +174,9 @@
 	}
 
 	.actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
 		margin-top: 1.5rem;
 	}
 
