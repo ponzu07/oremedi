@@ -27,3 +27,9 @@ data/
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+# Design docs (local only)
+docs/superpowers/
+
+# IDE
+.vscode/
