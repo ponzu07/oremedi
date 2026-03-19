@@ -1,5 +1,10 @@
 import type { PageServerLoad } from './$types';
+import type { Media } from '$lib/types';
 import { getDb } from '$lib/server/database';
+
+interface MovieRow extends Media {
+	genre_value: string | null;
+}
 
 export const load: PageServerLoad = async ({ url }) => {
 	const db = getDb();
@@ -20,7 +25,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	query += ' GROUP BY m.id ORDER BY m.title';
 
-	const movies = db.prepare(query).all(...params);
+	const movies = db.prepare(query).all(...params) as MovieRow[];
 
 	const genres = db.prepare(`
 		SELECT DISTINCT value FROM media_metadata

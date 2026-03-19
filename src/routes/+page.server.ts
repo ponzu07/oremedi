@@ -7,7 +7,7 @@ export const load: PageServerLoad = async () => {
 	const recentByCategory = (category: string, limit: number = 5) =>
 		db.prepare(
 			'SELECT id, title, category, thumbnail_path, created_at FROM media WHERE category = ? ORDER BY created_at DESC LIMIT ?'
-		).all(category, limit);
+		).all(category, limit) as { id: number; title: string; category: string; thumbnail_path: string | null; created_at: string }[];
 
 	return {
 		movies: recentByCategory('movie'),

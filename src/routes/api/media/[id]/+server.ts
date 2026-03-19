@@ -4,7 +4,7 @@ import { getDb } from '$lib/server/database';
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const media = db.prepare('SELECT * FROM media WHERE id = ?').get(params.id);
+	const media = db.prepare('SELECT * FROM media WHERE id = ?').get(params.id) as Record<string, unknown> | undefined;
 
 	if (!media) {
 		return json({ error: 'Not found' }, { status: 404 });
@@ -73,7 +73,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		}
 	}
 
-	const updated = db.prepare('SELECT * FROM media WHERE id = ?').get(params.id);
+	const updated = db.prepare('SELECT * FROM media WHERE id = ?').get(params.id) as Record<string, unknown>;
 	const updatedMeta = db.prepare('SELECT key, value FROM media_metadata WHERE media_id = ?').all(params.id);
 	const updatedTags = db.prepare(`
 		SELECT t.id, t.name, t.category FROM tags t

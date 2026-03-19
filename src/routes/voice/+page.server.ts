@@ -1,4 +1,5 @@
 import type { PageServerLoad } from './$types';
+import type { Media } from '$lib/types';
 import { getDb } from '$lib/server/database';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -17,7 +18,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	}
 
 	query += ' ORDER BY m.created_at DESC';
-	const items = db.prepare(query).all(...params);
+	const items = db.prepare(query).all(...params) as Media[];
 
 	const tags = db.prepare(`
 		SELECT DISTINCT t.name, t.category FROM tags t
@@ -27,7 +28,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		ORDER BY t.name
 	`).all() as { name: string; category: string }[];
 
-	const itemsWithTags = items.map((item: any) => {
+	const itemsWithTags = items.map((item) => {
 		const itemTags = db.prepare(`
 			SELECT t.name, t.category FROM tags t
 			JOIN media_tags mt ON t.id = mt.tag_id

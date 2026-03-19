@@ -1,4 +1,5 @@
 import type { PageServerLoad } from './$types';
+import type { Media } from '$lib/types';
 import { getDb } from '$lib/server/database';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -17,7 +18,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	}
 
 	query += ' ORDER BY m.created_at DESC';
-	const items = db.prepare(query).all(...params);
+	const items = db.prepare(query).all(...params) as Media[];
 
 	// Get all tags for live videos
 	const tags = db.prepare(`
@@ -29,7 +30,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	`).all() as { name: string; category: string }[];
 
 	// Get items with their tags for grouping
-	const itemsWithTags = items.map((item: any) => {
+	const itemsWithTags = items.map((item) => {
 		const itemTags = db.prepare(`
 			SELECT t.name, t.category FROM tags t
 			JOIN media_tags mt ON t.id = mt.tag_id
@@ -39,7 +40,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	});
 
 	// Get metadata for grouping (event_name, venue, date)
-	const itemsWithMeta = itemsWithTags.map((item: any) => {
+	const itemsWithMeta = itemsWithTags.map((item) => {
 		const meta = db.prepare(
 			'SELECT key, value FROM media_metadata WHERE media_id = ?'
 		).all(item.id) as { key: string; value: string }[];
