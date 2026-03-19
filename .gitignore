@@ -33,3 +33,6 @@ docs/superpowers/
 
 # IDE
 .vscode/
+
+# Local Claude config
+CLAUDE.local.md
