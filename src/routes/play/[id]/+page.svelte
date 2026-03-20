@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import CastButton from '$lib/components/CastButton.svelte';
+	import { playerStore } from '$lib/stores/player.svelte';
 	import {
 		downloadMedia,
 		getDownloadedMediaUrl,
@@ -30,18 +31,29 @@
 	};
 
 	onMount(async () => {
+		if (!isVideo) {
+			await playerStore.play(
+				media.id as number,
+				media.title as string,
+				media.category as string,
+				media.thumbnail_path as string | null
+			);
+		}
+
 		// Check if already downloaded
 		const existing = await getDownloadedMedia(media.id as number);
 		if (existing) {
 			isDownloaded = true;
 		}
 
-		// If offline, use downloaded version
-		if (!navigator.onLine && existing) {
-			const url = await getDownloadedMediaUrl(media.id as number);
-			if (url) {
-				mediaUrl = url;
-				isOffline = true;
+		// If offline, use downloaded version (video only)
+		if (isVideo) {
+			if (!navigator.onLine && existing) {
+				const url = await getDownloadedMediaUrl(media.id as number);
+				if (url) {
+					mediaUrl = url;
+					isOffline = true;
+				}
 			}
 		}
 	});
@@ -100,9 +112,20 @@
 						<div class="placeholder-art">&#9835;</div>
 					{/if}
 				</div>
-				<audio controls autoplay preload="metadata" src={mediaUrl}>
-					Your browser does not support the audio tag.
-				</audio>
+				<div class="audio-controls">
+					<button class="play-pause-btn" onclick={() => playerStore.togglePlayPause()}>
+						{#if playerStore.state.isPlaying}
+							<svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+								<rect x="6" y="4" width="4" height="16" />
+								<rect x="14" y="4" width="4" height="16" />
+							</svg>
+						{:else}
+							<svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+								<polygon points="5,3 19,12 5,21" />
+							</svg>
+						{/if}
+					</button>
+				</div>
 			</div>
 		{/if}
 	</div>
@@ -213,9 +236,23 @@
 		color: #444;
 	}
 
-	audio {
-		width: 100%;
-		max-width: 500px;
+	.audio-controls {
+		display: flex;
+		justify-content: center;
+		padding: 1rem 0;
+	}
+
+	.play-pause-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 64px;
+		height: 64px;
+		background: var(--color-accent, #5b9df5);
+		border: none;
+		border-radius: 50%;
+		color: var(--color-text, #fff);
+		cursor: pointer;
 	}
 
 	.media-info h1 {
