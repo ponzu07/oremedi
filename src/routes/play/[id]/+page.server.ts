@@ -21,5 +21,13 @@ export const load: PageServerLoad = async ({ params }) => {
 		WHERE mt.media_id = ?
 	`).all(params.id) as { id: number; name: string; category: string }[];
 
-	return { media: { ...media, metadata, tags } };
+	// For audio categories, fetch all media in the same category for queue
+	let siblingMedia: { id: number; title: string; category: string; thumbnail_path: string | null }[] = [];
+	if (media.category === 'music' || media.category === 'voice') {
+		siblingMedia = db.prepare(
+			'SELECT id, title, category, thumbnail_path FROM media WHERE category = ? ORDER BY title'
+		).all(media.category) as typeof siblingMedia;
+	}
+
+	return { media: { ...media, metadata, tags }, siblingMedia };
 };

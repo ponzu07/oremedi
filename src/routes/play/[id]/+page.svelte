@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import CastButton from '$lib/components/CastButton.svelte';
-	import { playerStore } from '$lib/stores/player.svelte';
+	import { playerStore, type QueueItem } from '$lib/stores/player.svelte';
 	import {
 		downloadMedia,
 		getDownloadedMediaUrl,
@@ -44,12 +44,25 @@
 
 	onMount(async () => {
 		if (!isVideo) {
-			await playerStore.play(
-				media.id as number,
-				media.title as string,
-				media.category as string,
-				media.thumbnail_path as string | null
-			);
+			// Build queue from all siblings in the same category
+			const siblings = data.siblingMedia ?? [];
+			if (siblings.length > 1) {
+				const queue: QueueItem[] = siblings.map(s => ({
+					mediaId: s.id,
+					title: s.title,
+					category: s.category,
+					thumbnailPath: s.thumbnail_path ?? null
+				}));
+				const startIndex = siblings.findIndex(s => s.id === media.id);
+				await playerStore.playQueue(queue, Math.max(0, startIndex));
+			} else {
+				await playerStore.play(
+					media.id as number,
+					media.title as string,
+					media.category as string,
+					media.thumbnail_path as string | null
+				);
+			}
 		}
 
 		// Check if already downloaded
