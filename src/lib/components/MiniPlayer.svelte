@@ -8,7 +8,7 @@
 	);
 
 	// Seekbar state
-	let seekbar: HTMLDivElement;
+	let seekbar = $state<HTMLDivElement>(undefined as unknown as HTMLDivElement);
 	let isSeeking = $state(false);
 
 	function handleSeekStart(e: PointerEvent) {
