@@ -39,11 +39,22 @@
 {/if}
 
 <style>
+	@keyframes fadeIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+
 	:global(body) {
 		margin: 0;
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		background: var(--color-bg);
 		color: var(--color-text);
 		padding-bottom: var(--bottom-offset);
+	}
+
+	:global(.home),
+	:global(.list-page),
+	:global(.player-page) {
+		animation: fadeIn 0.2s ease-out;
 	}
 </style>
