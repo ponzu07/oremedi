@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import CastButton from '$lib/components/CastButton.svelte';
 	import {
@@ -45,6 +46,14 @@
 		}
 	});
 
+	function goBack() {
+		if (document.referrer && new URL(document.referrer).origin === location.origin) {
+			history.back();
+		} else {
+			goto(isVideo ? '/video' : '/audio');
+		}
+	}
+
 	async function handleDownload() {
 		downloading = true;
 		downloadProgress = 0;
@@ -68,7 +77,12 @@
 
 <div class="player-page">
 	<nav>
-		<a href="/">Home</a>
+		<button class="back-btn" onclick={goBack}>
+			<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M19 12H5M12 19l-7-7 7-7" />
+			</svg>
+			Back
+		</button>
 	</nav>
 
 	<div class="player-container">
@@ -147,8 +161,16 @@
 		margin-bottom: 1rem;
 	}
 
-	nav a {
-		color: #4a9eff;
+	.back-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		background: none;
+		border: none;
+		color: var(--color-accent, #5b9df5);
+		cursor: pointer;
+		font-size: 0.9rem;
+		padding: 0;
 	}
 
 	.player-container {

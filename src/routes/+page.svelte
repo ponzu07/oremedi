@@ -4,10 +4,10 @@
 	let { data }: { data: PageData } = $props();
 
 	const categories = [
-		{ key: 'movies', label: 'Movies', href: '/movies', items: data.movies },
-		{ key: 'liveVideos', label: 'Live Videos', href: '/live', items: data.liveVideos },
-		{ key: 'voices', label: 'Voice', href: '/voice', items: data.voices },
-		{ key: 'music', label: 'Music', href: '/music', items: data.music }
+		{ key: 'movies', label: 'Movies', href: '/video?sub=movie', items: data.movies },
+		{ key: 'liveVideos', label: 'Live Videos', href: '/video?sub=live', items: data.liveVideos },
+		{ key: 'voices', label: 'Voice', href: '/audio?sub=voice', items: data.voices },
+		{ key: 'music', label: 'Music', href: '/audio?sub=music', items: data.music }
 	];
 </script>
 
