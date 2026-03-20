@@ -7,11 +7,12 @@
 	let groupBy = $state<GroupBy>('none');
 
 	// Reset groupBy when sub-category changes
-	let prevSub = $state(data.currentSub);
+	let prevSub = $state('');
 	$effect(() => {
-		if (data.currentSub !== prevSub) {
-			groupBy = 'none';
-			prevSub = data.currentSub;
+		const currentSub = data.currentSub;
+		if (currentSub !== prevSub) {
+			if (prevSub !== '') groupBy = 'none';
+			prevSub = currentSub ?? '';
 		}
 	});
 

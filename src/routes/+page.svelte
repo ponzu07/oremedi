@@ -3,12 +3,12 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const categories = [
+	const categories = $derived([
 		{ key: 'movies', label: 'Movies', href: '/video?sub=movie', items: data.movies, type: 'video' as const },
 		{ key: 'liveVideos', label: 'Live Videos', href: '/video?sub=live', items: data.liveVideos, type: 'video' as const },
 		{ key: 'voices', label: 'Voice', href: '/audio?sub=voice', items: data.voices, type: 'audio' as const },
 		{ key: 'music', label: 'Music', href: '/audio?sub=music', items: data.music, type: 'audio' as const }
-	];
+	]);
 
 	const placeholderIcons: Record<string, string> = {
 		movies: '\u25B6',
