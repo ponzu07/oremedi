@@ -234,7 +234,7 @@
 
 	.sub-chips a.active {
 		background: var(--color-accent);
-		color: #fff;
+		color: var(--color-text);
 	}
 
 	/* Filters (genre / tag) */
@@ -256,7 +256,7 @@
 
 	.filters a.active {
 		background: var(--color-accent);
-		color: #fff;
+		color: var(--color-text);
 	}
 
 	/* Group-by toggle */
@@ -281,7 +281,7 @@
 
 	.group-toggle button.active {
 		background: var(--color-accent);
-		color: #fff;
+		color: var(--color-text);
 	}
 
 	.empty {
@@ -313,6 +313,11 @@
 	.media-card {
 		text-decoration: none;
 		color: inherit;
+		transition: transform 0.1s ease;
+	}
+
+	.media-card:active {
+		transform: scale(0.97);
 	}
 
 	.thumb-wrap {
@@ -386,6 +391,11 @@
 		padding: 0.75rem 0;
 		text-decoration: none;
 		align-items: center;
+		transition: transform 0.1s ease;
+	}
+
+	.item-link:active {
+		transform: scale(0.98);
 	}
 
 	.thumb {

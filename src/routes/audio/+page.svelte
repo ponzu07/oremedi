@@ -220,7 +220,7 @@
 
 	.sub-chips a.active {
 		background: var(--color-accent);
-		color: #fff;
+		color: var(--color-text);
 	}
 
 	/* Filters (tag) */
@@ -242,7 +242,7 @@
 
 	.filters a.active {
 		background: var(--color-accent);
-		color: #fff;
+		color: var(--color-text);
 	}
 
 	/* Group-by toggle */
@@ -267,7 +267,7 @@
 
 	.group-toggle button.active {
 		background: var(--color-accent);
-		color: #fff;
+		color: var(--color-text);
 	}
 
 	.empty {
@@ -314,6 +314,11 @@
 		padding: 0.6rem 0;
 		text-decoration: none;
 		align-items: center;
+		transition: transform 0.1s ease;
+	}
+
+	.item-link:active {
+		transform: scale(0.98);
 	}
 
 	/* Thumbnails - 48x48 Spotify-style */
