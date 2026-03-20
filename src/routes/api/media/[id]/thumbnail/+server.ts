@@ -16,9 +16,13 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 
 	const data = fs.readFileSync(media.thumbnail_path);
+	const ext = media.thumbnail_path.split('.').pop()?.toLowerCase();
+	const contentType = ext === 'svg' ? 'image/svg+xml'
+		: ext === 'png' ? 'image/png'
+		: 'image/jpeg';
 	return new Response(data, {
 		headers: {
-			'Content-Type': 'image/jpeg',
+			'Content-Type': contentType,
 			'Cache-Control': 'public, max-age=86400'
 		}
 	});

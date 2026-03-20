@@ -1,6 +1,6 @@
 import type { Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { verifyPassword, createToken } from '$lib/server/auth';
+import { createToken } from '$lib/server/auth';
 import { config } from '$lib/server/config';
 
 export const actions: Actions = {
@@ -12,17 +12,17 @@ export const actions: Actions = {
 			return fail(400, { error: 'Password is required' });
 		}
 
-		const valid = await verifyPassword(password, config.passwordHash);
-		if (!valid) {
+		if (password !== config.password) {
 			return fail(401, { error: 'Invalid password' });
 		}
 
 		const token = createToken(config.jwtSecret);
+		const isProduction = process.env.NODE_ENV === 'production';
 		cookies.set('auth_token', token, {
 			path: '/',
 			httpOnly: true,
 			sameSite: 'lax',
-			secure: true,
+			secure: isProduction,
 			maxAge: 60 * 60 * 24 * 30
 		});
 

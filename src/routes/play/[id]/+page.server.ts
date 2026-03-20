@@ -21,11 +21,14 @@ export const load: PageServerLoad = async ({ params }) => {
 		WHERE mt.media_id = ?
 	`).all(params.id) as { id: number; name: string; category: string }[];
 
-	// For audio categories, fetch all media in the same category for queue
+	// Fetch all media in the same category for queue
 	let siblingMedia: { id: number; title: string; category: string; thumbnail_path: string | null }[] = [];
-	if (media.category === 'music' || media.category === 'voice') {
+	if (['music', 'voice', 'movie', 'live_video'].includes(media.category)) {
+		const orderClause = (media.category === 'movie' || media.category === 'live_video')
+			? 'ORDER BY created_at DESC'
+			: 'ORDER BY title';
 		siblingMedia = db.prepare(
-			'SELECT id, title, category, thumbnail_path FROM media WHERE category = ? ORDER BY title'
+			`SELECT id, title, category, thumbnail_path FROM media WHERE category = ? ${orderClause}`
 		).all(media.category) as typeof siblingMedia;
 	}
 

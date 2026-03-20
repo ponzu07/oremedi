@@ -8,7 +8,7 @@ services:
       - /volume1/media-converted:/media-converted
       - ./data:/data
     environment:
-      - PASSWORD_HASH=${PASSWORD_HASH}
+      - PASSWORD=${PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - DATABASE_PATH=/data/oremedi.db
       - MEDIA_PATH=/media

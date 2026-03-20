@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { playerStore } from '$lib/stores/player.svelte';
+	import { playerStore, isVideoCategory } from '$lib/stores/player.svelte';
 
 	const ps = $derived(playerStore.state);
+	const isVideo = $derived(isVideoCategory(ps.category));
 
 	const progress = $derived(
 		ps.duration > 0 ? (ps.currentTime / ps.duration) * 100 : 0
@@ -60,7 +61,7 @@
 </script>
 
 {#if ps.mediaId}
-	<div class="mini-player">
+	<div class="mini-player" class:has-video={isVideo}>
 		<!-- Seekbar -->
 		<div
 			class="seekbar-area"
@@ -82,9 +83,12 @@
 
 		<!-- Control row -->
 		<div class="control-row">
-			<!-- Left: thumbnail + title (link to full player) -->
+			<!-- Left: thumbnail/video slot + title (link to full player) -->
 			<a href="/play/{ps.mediaId}" class="mini-info-link">
-				{#if ps.thumbnailPath}
+				{#if isVideo}
+					<!-- Blank slot: the global fixed <video> visually overlaps here -->
+					<div class="mini-video-slot" aria-hidden="true"></div>
+				{:else if ps.thumbnailPath}
 					<img src={`/api/media/${ps.mediaId}/thumbnail`} alt={ps.title} class="mini-thumb" />
 				{:else}
 					<div class="mini-thumb-placeholder">&#9835;</div>
@@ -148,6 +152,10 @@
 		display: flex;
 		flex-direction: column;
 		z-index: 99;
+	}
+
+	.mini-player.has-video {
+		height: 80px;
 	}
 
 	/* Seekbar */
@@ -214,6 +222,14 @@
 		font-size: 1.2rem;
 		color: var(--color-text-muted);
 		flex-shrink: 0;
+	}
+
+	.mini-video-slot {
+		width: 120px;
+		height: 68px;
+		flex-shrink: 0;
+		border-radius: 4px;
+		background: transparent;
 	}
 
 	.mini-title {
