@@ -28,10 +28,6 @@
 <div class="home">
 	<header>
 		<h1>OreMedi</h1>
-		<nav>
-			<a href="/downloads">Downloads</a>
-			<a href="/admin">Admin</a>
-		</nav>
 	</header>
 
 	{#each categories as cat}
@@ -72,19 +68,7 @@
 	}
 
 	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
 		margin-bottom: 2rem;
-	}
-
-	header nav {
-		display: flex;
-		gap: 1rem;
-	}
-
-	header a {
-		color: var(--color-accent);
 	}
 
 	.category-section {

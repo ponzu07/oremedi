@@ -1,24 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import CastButton from '$lib/components/CastButton.svelte';
-	import { playerStore, type QueueItem } from '$lib/stores/player.svelte';
+	import { playerStore, type QueueItem, isVideoCategory } from '$lib/stores/player.svelte';
 	import {
 		downloadMedia,
 		getDownloadedMediaUrl,
 		getDownloadedMedia,
 		formatSize
 	} from '$lib/download-manager';
+	import { categoryLabels } from '$lib/constants';
 
 	let { data }: { data: PageData } = $props();
 	const media = data.media;
 
 	const isVideo = ['movie', 'live_video'].includes(media.category as string);
-	const onlineStreamUrl = `/api/media/${media.id}/stream`;
 
-	let mediaUrl = $state(onlineStreamUrl);
-	let isOffline = $state(false);
 	let isDownloaded = $state(false);
 	let downloading = $state(false);
 	let downloadProgress = $state(0);
@@ -28,23 +26,109 @@
 	let isSeeking = $state(false);
 	let seekValue = $state(0);
 
-	const categoryLabels: Record<string, string> = {
-		movie: 'Movie',
-		live_video: 'Live Video',
-		voice: 'Voice',
-		music: 'Music'
-	};
+	// Video UI states (overlay, seekbar drag, resume — all local to this page)
+	let videoSeeking = $state(false);
+	let videoSeekValue = $state(0);
+	let controlsVisible = $state(true);
+	let hideTimer: ReturnType<typeof setTimeout> | null = null;
+	let showMetadata = $state(false);
+	let resumeTime = $state<number | null>(null);
+	let resumeSaveInterval: ReturnType<typeof setInterval> | null = null;
+	let isPip = $state(false);
 
-	// Sync seekValue from store when not seeking
+	// Sync seekValue from store when not seeking (audio)
 	$effect(() => {
 		if (!isSeeking) {
 			seekValue = playerStore.state.currentTime;
 		}
 	});
 
+	// Video: sync videoSeekValue from store when not seeking
+	$effect(() => {
+		if (!videoSeeking) {
+			videoSeekValue = playerStore.state.currentTime;
+		}
+	});
+
+	// React to store isPlaying changes for video resume/controls
+	$effect(() => {
+		if (!isVideo) return;
+		const playing = playerStore.state.isPlaying;
+		if (playing) {
+			startResumeInterval();
+			scheduleHideControls();
+		} else {
+			stopResumeInterval();
+			saveResumePosition();
+			showControls();
+		}
+	});
+
+	// Check resume time validity when duration changes
+	$effect(() => {
+		if (!isVideo) return;
+		const dur = playerStore.state.duration;
+		if (resumeTime && dur > 0 && resumeTime >= dur * 0.95) {
+			resumeTime = null;
+		}
+	});
+
+	function getResumeKey(id: number) {
+		return `oremedi-resume-${id}`;
+	}
+
+	function saveResumePosition() {
+		if (!isVideo) return;
+		const time = playerStore.state.currentTime;
+		if (time > 10) {
+			localStorage.setItem(getResumeKey(media.id as number), JSON.stringify({ time, updatedAt: Date.now() }));
+		}
+	}
+
+	function clearResumePosition() {
+		localStorage.removeItem(getResumeKey(media.id as number));
+	}
+
+	function startResumeInterval() {
+		if (resumeSaveInterval) clearInterval(resumeSaveInterval);
+		resumeSaveInterval = setInterval(saveResumePosition, 30000);
+	}
+
+	function stopResumeInterval() {
+		if (resumeSaveInterval) {
+			clearInterval(resumeSaveInterval);
+			resumeSaveInterval = null;
+		}
+	}
+
 	onMount(async () => {
-		if (!isVideo) {
-			// Build queue from all siblings in the same category
+		if (isVideo) {
+			playerStore.setFullPlayer(true);
+
+			// If this media is already playing (came from video page), don't restart
+			if (playerStore.state.mediaId !== (media.id as number)) {
+				await playerStore.play(
+					media.id as number,
+					media.title as string,
+					media.category as string,
+					media.thumbnail_path as string | null
+				);
+			}
+
+			// Check for resume position
+			const saved = localStorage.getItem(getResumeKey(media.id as number));
+			if (saved) {
+				try {
+					const { time } = JSON.parse(saved);
+					if (time > 10) {
+						resumeTime = time;
+					}
+				} catch {}
+			}
+
+			window.addEventListener('beforeunload', saveResumePosition);
+		} else {
+			// Audio: Build queue from all siblings in the same category
 			const siblings = data.siblingMedia ?? [];
 			if (siblings.length > 1) {
 				const queue: QueueItem[] = siblings.map(s => ({
@@ -70,18 +154,86 @@
 		if (existing) {
 			isDownloaded = true;
 		}
+	});
 
-		// If offline, use downloaded version (video only)
+	onDestroy(() => {
 		if (isVideo) {
-			if (!navigator.onLine && existing) {
-				const url = await getDownloadedMediaUrl(media.id as number);
-				if (url) {
-					mediaUrl = url;
-					isOffline = true;
-				}
+			playerStore.setFullPlayer(false);
+			saveResumePosition();
+			window.removeEventListener('beforeunload', saveResumePosition);
+		}
+		stopResumeInterval();
+		if (hideTimer) clearTimeout(hideTimer);
+	});
+
+	function showControls() {
+		controlsVisible = true;
+		if (hideTimer) clearTimeout(hideTimer);
+	}
+
+	function scheduleHideControls() {
+		if (hideTimer) clearTimeout(hideTimer);
+		if (!playerStore.state.isPlaying) return;
+		hideTimer = setTimeout(() => {
+			if (playerStore.state.isPlaying && !videoSeeking) {
+				controlsVisible = false;
+			}
+		}, 3000);
+	}
+
+	function onOverlayInteraction() {
+		showControls();
+		scheduleHideControls();
+	}
+
+	function onOverlayClick() {
+		if (controlsVisible) {
+			playerStore.togglePlayPause();
+		} else {
+			showControls();
+			scheduleHideControls();
+		}
+	}
+
+	async function togglePip() {
+		const el = playerStore.getVideoElement();
+		if (!el) return;
+		try {
+			if (document.pictureInPictureElement) {
+				await document.exitPictureInPicture();
+				isPip = false;
+			} else {
+				await el.requestPictureInPicture();
+				isPip = true;
+			}
+		} catch (e) {
+			console.warn('PiP failed:', e);
+		}
+	}
+
+	function toggleFullscreen() {
+		const el = playerStore.getVideoElement();
+		if (!el) return;
+		if (document.fullscreenElement) {
+			document.exitFullscreen();
+		} else {
+			el.requestFullscreen();
+		}
+	}
+
+	function handleResume() {
+		if (resumeTime) {
+			playerStore.seek(resumeTime);
+			resumeTime = null;
+			if (!playerStore.state.isPlaying) {
+				playerStore.togglePlayPause();
 			}
 		}
-	});
+	}
+
+	function dismissResume() {
+		resumeTime = null;
+	}
 
 	function goBack() {
 		if (document.referrer && new URL(document.referrer).origin === location.origin) {
@@ -113,8 +265,10 @@
 
 	function formatTime(seconds: number): string {
 		if (!seconds || !isFinite(seconds)) return '0:00';
-		const m = Math.floor(seconds / 60);
+		const h = Math.floor(seconds / 3600);
+		const m = Math.floor((seconds % 3600) / 60);
 		const s = Math.floor(seconds % 60);
+		if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	}
 
@@ -129,53 +283,247 @@
 			return parts.join(' · ');
 		})()
 	);
+
+	let pipSupported = $derived(typeof document !== 'undefined' && document.pictureInPictureEnabled);
+	let fullscreenSupported = $derived(typeof document !== 'undefined' && document.fullscreenEnabled);
 </script>
 
 {#if isVideo}
-<div class="player-page">
-	<nav>
-		<button class="back-btn" onclick={goBack}>
-			<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-				<path d="M19 12H5M12 19l-7-7 7-7" />
-			</svg>
-			Back
-		</button>
-	</nav>
+<!-- Video overlay controls (sits on top of the global <video> from layout) -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="vp-overlay-container" onpointermove={onOverlayInteraction}>
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div
+		class="vp-overlay"
+		class:vp-overlay-visible={controlsVisible}
+		onclick={onOverlayClick}
+	>
+		<!-- Top bar -->
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div class="vp-top-bar" onclick={(e) => e.stopPropagation()}>
+			<button class="vp-btn" onclick={goBack} aria-label="Back">
+				<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M19 12H5M12 19l-7-7 7-7" />
+				</svg>
+			</button>
+			<span class="vp-title">{playerStore.state.title || media.title}</span>
+		</div>
 
-	<div class="player-container">
-		<!-- svelte-ignore a11y_media_has_caption -->
-		<video controls autoplay preload="metadata" src={mediaUrl}>
-			Your browser does not support the video tag.
-		</video>
+		<!-- Center play/pause -->
+		<div class="vp-center">
+			<button class="vp-center-btn" onclick={(e) => { e.stopPropagation(); playerStore.togglePlayPause(); }} aria-label={playerStore.state.isPlaying ? 'Pause' : 'Play'}>
+				{#if playerStore.state.isPlaying}
+					<svg viewBox="0 0 24 24" width="36" height="36" fill="white">
+						<rect x="6" y="4" width="4" height="16" rx="1" />
+						<rect x="14" y="4" width="4" height="16" rx="1" />
+					</svg>
+				{:else}
+					<svg viewBox="0 0 24 24" width="36" height="36" fill="white">
+						<polygon points="6,3 20,12 6,21" />
+					</svg>
+				{/if}
+			</button>
+		</div>
+
+		<!-- Bottom bar -->
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div class="vp-bottom-bar" onclick={(e) => e.stopPropagation()}>
+			<!-- Seekbar -->
+			<div class="vp-seek-row">
+				<span class="vp-time">{formatTime(videoSeeking ? videoSeekValue : playerStore.state.currentTime)}</span>
+				<input
+					type="range"
+					class="vp-seek-bar"
+					min="0"
+					max={playerStore.state.duration || 0}
+					value={videoSeeking ? videoSeekValue : playerStore.state.currentTime}
+					step="0.1"
+					oninput={(e) => {
+						videoSeeking = true;
+						videoSeekValue = parseFloat((e.target as HTMLInputElement).value);
+						showControls();
+					}}
+					onchange={(e) => {
+						const val = parseFloat((e.target as HTMLInputElement).value);
+						playerStore.seek(val);
+						videoSeeking = false;
+						scheduleHideControls();
+					}}
+				/>
+				<span class="vp-time">{formatTime(playerStore.state.duration)}</span>
+			</div>
+
+			<!-- Controls row -->
+			<div class="vp-controls-row">
+				<button class="vp-btn" class:vp-active={playerStore.state.shuffle} onclick={() => playerStore.toggleShuffle()} aria-label="Shuffle">
+					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<polyline points="16 3 21 3 21 8" />
+						<line x1="4" y1="20" x2="21" y2="3" />
+						<polyline points="21 16 21 21 16 21" />
+						<line x1="15" y1="15" x2="21" y2="21" />
+						<line x1="4" y1="4" x2="9" y2="9" />
+					</svg>
+				</button>
+
+				<button class="vp-btn vp-rate-btn" onclick={() => playerStore.cyclePlaybackRate()}>
+					{playerStore.state.playbackRate.toFixed(playerStore.state.playbackRate % 1 === 0 ? 1 : 2)}x
+				</button>
+
+				<button class="vp-btn" onclick={() => playerStore.skipBackward(10)} aria-label="10 seconds back">
+					<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M1 4v6h6" />
+						<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+					</svg>
+					<span class="vp-skip-label">10</span>
+				</button>
+
+				<button class="vp-btn" onclick={() => playerStore.skipForward(10)} aria-label="10 seconds forward">
+					<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M23 4v6h-6" />
+						<path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
+					</svg>
+					<span class="vp-skip-label">10</span>
+				</button>
+
+				<button class="vp-btn" onclick={() => playerStore.previous()} aria-label="Previous">
+					<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+						<rect x="4" y="6" width="2.5" height="12" rx="0.5" />
+						<polygon points="19,6 9,12 19,18" />
+					</svg>
+				</button>
+
+				<button class="vp-btn" onclick={() => playerStore.next()} aria-label="Next">
+					<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+						<polygon points="5,6 15,12 5,18" />
+						<rect x="17.5" y="6" width="2.5" height="12" rx="0.5" />
+					</svg>
+				</button>
+
+				{#if pipSupported}
+					<button class="vp-btn" class:vp-active={isPip} onclick={togglePip} aria-label="Picture in Picture">
+						<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="2" y="3" width="20" height="14" rx="2" />
+							<rect x="12" y="9" width="8" height="6" rx="1" fill="currentColor" opacity="0.4" />
+						</svg>
+					</button>
+				{/if}
+
+				<CastButton mediaId={media.id as number} title={media.title as string} {isVideo} />
+
+				<div class="vp-volume-group">
+					<button class="vp-btn" onclick={() => playerStore.toggleMute()} aria-label={playerStore.state.muted ? 'Unmute' : 'Mute'}>
+						{#if playerStore.state.muted || playerStore.state.volume === 0}
+							<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+								<line x1="23" y1="9" x2="17" y2="15" />
+								<line x1="17" y1="9" x2="23" y2="15" />
+							</svg>
+						{:else if playerStore.state.volume < 0.5}
+							<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+								<path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+							</svg>
+						{:else}
+							<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+								<path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+								<path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+							</svg>
+						{/if}
+					</button>
+					<input
+						type="range"
+						class="vp-volume-slider"
+						min="0"
+						max="1"
+						step="0.05"
+						value={playerStore.state.muted ? 0 : playerStore.state.volume}
+						oninput={(e) => {
+							const vol = parseFloat((e.target as HTMLInputElement).value);
+							playerStore.setVolume(vol);
+							showControls();
+						}}
+						onchange={() => scheduleHideControls()}
+					/>
+				</div>
+
+				{#if downloading}
+					<span class="vp-dl-pct">{Math.round(downloadProgress)}%</span>
+				{:else if !isDownloaded}
+					<button class="vp-btn" onclick={handleDownload} aria-label="Save Offline">
+						<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+							<polyline points="7 10 12 15 17 10" />
+							<line x1="12" y1="15" x2="12" y2="3" />
+						</svg>
+					</button>
+				{/if}
+
+				{#if fullscreenSupported}
+					<button class="vp-btn" onclick={toggleFullscreen} aria-label="Fullscreen">
+						<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<polyline points="15 3 21 3 21 9" />
+							<polyline points="9 21 3 21 3 15" />
+							<line x1="21" y1="3" x2="14" y2="10" />
+							<line x1="3" y1="21" x2="10" y2="14" />
+						</svg>
+					</button>
+				{/if}
+
+				<button class="vp-btn vp-repeat-btn" class:vp-active={playerStore.state.repeatMode !== 'off'} onclick={() => playerStore.setRepeatMode()} aria-label="Repeat">
+					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<polyline points="17 1 21 5 17 9" />
+						<path d="M3 11V9a4 4 0 0 1 4-4h14" />
+						<polyline points="7 23 3 19 7 15" />
+						<path d="M21 13v2a4 4 0 0 1-4 4H3" />
+					</svg>
+					{#if playerStore.state.repeatMode === 'one'}
+						<span class="vp-repeat-badge">1</span>
+					{/if}
+				</button>
+			</div>
+		</div>
 	</div>
 
-	<div class="media-info">
-		<h1>{media.title}</h1>
-		<span class="category">{categoryLabels[media.category as string] ?? media.category}</span>
+	<!-- Resume overlay -->
+	{#if resumeTime}
+		<div class="vp-resume">
+			<button class="vp-resume-btn" onclick={handleResume}>
+				続きから再生 ({formatTime(resumeTime)})
+			</button>
+			<button class="vp-resume-dismiss" onclick={dismissResume} aria-label="Dismiss">
+				<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+					<line x1="18" y1="6" x2="6" y2="18" />
+					<line x1="6" y1="6" x2="18" y2="18" />
+				</svg>
+			</button>
+		</div>
+	{/if}
+</div>
 
-		{#if media.tags && (media.tags as any[]).length > 0}
-			<div class="tags">
-				{#each media.tags as tag}
-					<span class="tag">{tag.name}</span>
-				{/each}
-			</div>
+<!-- Media info (below the fixed video area, pushed down) -->
+<div class="vp-info-page">
+	<div class="vp-info">
+		<h1 class="vp-info-title">{media.title}</h1>
+		<div class="vp-info-subtitle">{tagsText}</div>
+
+		{#if playerStore.state.isOffline}
+			<div class="vp-offline-badge">Offline playback</div>
 		{/if}
 
 		{#if media.metadata && (media.metadata as any[]).length > 0}
-			<dl class="metadata">
-				{#each media.metadata as meta}
-					<dt>{meta.key}</dt>
-					<dd>{meta.value}</dd>
-				{/each}
-			</dl>
+			<details class="vp-details" bind:open={showMetadata}>
+				<summary>詳細情報</summary>
+				<dl class="vp-meta-grid">
+					{#each media.metadata as meta}
+						<dt>{meta.key}</dt>
+						<dd>{meta.value}</dd>
+					{/each}
+				</dl>
+			</details>
 		{/if}
 
-		{#if isOffline}
-			<div class="offline-badge">Offline playback</div>
-		{/if}
-
-		<div class="actions">
-			<CastButton mediaId={media.id as number} title={media.title as string} {isVideo} />
+		<div class="vp-actions">
 			{#if downloading}
 				<div class="download-progress">
 					<div class="progress-bar">
@@ -186,10 +534,68 @@
 			{:else if isDownloaded}
 				<span class="downloaded-badge">Downloaded</span>
 			{:else}
-				<button class="btn" onclick={handleDownload}>Save Offline</button>
+				<button class="vp-action-btn" onclick={handleDownload}>
+					<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+						<polyline points="7 10 12 15 17 10" />
+						<line x1="12" y1="15" x2="12" y2="3" />
+					</svg>
+					Save Offline
+				</button>
 			{/if}
 		</div>
 	</div>
+
+	<!-- Queue -->
+	{#if playerStore.state.queue.length > 1}
+		<div class="vp-queue">
+			<h3 class="vp-queue-title">Queue</h3>
+			<div class="vp-queue-list">
+				{#each playerStore.state.queue as item, i}
+					<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+					<div
+						role="button"
+						tabindex="0"
+						class="vp-queue-item"
+						class:vp-queue-current={i === playerStore.state.currentIndex}
+						onclick={() => playerStore.playFromQueue(i)}
+					>
+						<div class="vp-queue-thumb">
+							{#if item.thumbnailPath}
+								<img src={`/api/media/${item.mediaId}/thumbnail`} alt={item.title} />
+							{:else}
+								<div class="vp-queue-thumb-placeholder">
+									{#if isVideoCategory(item.category)}
+										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+											<rect x="2" y="4" width="20" height="16" rx="2" />
+											<polygon points="10,8 16,12 10,16" fill="currentColor" opacity="0.5" />
+										</svg>
+									{:else}
+										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+											<path d="M9 18V5l12-2v13" />
+											<circle cx="6" cy="18" r="3" />
+											<circle cx="18" cy="16" r="3" />
+										</svg>
+									{/if}
+								</div>
+							{/if}
+						</div>
+						<span class="vp-queue-item-title">{item.title}</span>
+						<button
+							class="vp-queue-remove"
+							onclick={(e) => { e.stopPropagation(); playerStore.removeFromQueue(i); }}
+							aria-label="Remove from queue"
+						>
+							<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 </div>
 {:else}
 <!-- Audio: Apple Music-style full player -->
@@ -411,119 +817,459 @@
 {/if}
 
 <style>
-	/* === Video page styles (unchanged) === */
-	.player-page {
+	/* === Video player overlay === */
+	.vp-overlay-container {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 56.25vw; /* 16:9, matches gvw-full */
+		max-height: 60vh;
+		z-index: 51;
+	}
+
+	.vp-info-page {
+		padding-top: min(56.25vw, 60vh); /* matches fixed video area height */
 		max-width: 960px;
 		margin: 0 auto;
-		padding: 1rem;
 	}
 
-	nav {
-		margin-bottom: 1rem;
+	/* Overlay */
+	.vp-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.3s ease;
+		z-index: 2;
 	}
 
-	.back-btn {
+	.vp-overlay-visible {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	/* Top bar */
+	.vp-top-bar {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
-		background: none;
-		border: none;
-		color: var(--color-accent);
-		cursor: pointer;
-		font-size: var(--font-size-base);
-		padding: 0;
-	}
-
-	.player-container {
-		margin-bottom: 1.5rem;
-	}
-
-	video {
-		width: 100%;
-		max-height: 70vh;
-		background: var(--color-bg);
-		border-radius: var(--radius-md);
-	}
-
-	.media-info h1 {
-		margin: 0 0 0.5rem;
-		font-size: 1.5rem;
-	}
-
-	.category {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-base);
-	}
-
-	.tags {
-		display: flex;
 		gap: 0.5rem;
-		flex-wrap: wrap;
-		margin-top: 0.75rem;
+		padding: 0.75rem 1rem;
+		background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
 	}
 
-	.tag {
-		padding: 0.25rem 0.75rem;
-		background: var(--color-surface);
-		border-radius: var(--radius-pill);
-		font-size: var(--font-size-sm);
-		color: var(--color-text-secondary);
+	.vp-title {
+		color: white;
+		font-size: 0.9rem;
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		flex: 1;
 	}
 
-	.metadata {
-		margin-top: 1rem;
-		display: grid;
-		grid-template-columns: auto 1fr;
-		gap: 0.25rem 1rem;
+	/* Center button */
+	.vp-center {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex: 1;
+		pointer-events: none;
 	}
 
-	.metadata dt {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-base);
+	.vp-center-btn {
+		width: 56px;
+		height: 56px;
+		border-radius: 50%;
+		background: rgba(0,0,0,0.5);
+		border: none;
+		color: white;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: auto;
 	}
 
-	.metadata dd {
-		margin: 0;
+	.vp-center-btn:active {
+		background: rgba(0,0,0,0.7);
 	}
 
-	.actions {
+	/* Bottom bar */
+	.vp-bottom-bar {
+		padding: 0.5rem 1rem 0.75rem;
+		background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	/* Seek row */
+	.vp-seek-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.vp-time {
+		color: white;
+		font-size: 0.7rem;
+		font-variant-numeric: tabular-nums;
+		min-width: 3em;
+	}
+
+	.vp-time:last-child {
+		text-align: right;
+	}
+
+	.vp-seek-bar {
+		-webkit-appearance: none;
+		appearance: none;
+		flex: 1;
+		height: 4px;
+		background: rgba(255,255,255,0.3);
+		border-radius: 2px;
+		outline: none;
+		cursor: pointer;
+	}
+
+	.vp-seek-bar::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 14px;
+		height: 14px;
+		background: white;
+		border-radius: 50%;
+		cursor: pointer;
+		border: none;
+	}
+
+	.vp-seek-bar::-moz-range-thumb {
+		width: 14px;
+		height: 14px;
+		background: white;
+		border-radius: 50%;
+		cursor: pointer;
+		border: none;
+	}
+
+	/* Controls row */
+	.vp-controls-row {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		margin-top: 1.5rem;
+		flex-wrap: wrap;
 	}
 
-	.btn {
+	.vp-btn {
+		background: none;
+		border: none;
+		color: white;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 4px;
+		position: relative;
+	}
+
+	.vp-btn:active {
+		opacity: 0.6;
+	}
+
+	.vp-btn.vp-active {
+		color: var(--color-accent);
+	}
+
+	.vp-rate-btn {
+		font-size: 0.8rem;
+		font-weight: 700;
+		min-width: 3em;
+	}
+
+	.vp-skip-label {
+		position: absolute;
+		font-size: 0.5rem;
+		font-weight: 700;
+		color: currentColor;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -38%);
+	}
+
+	.vp-volume-group {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.vp-volume-slider {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 60px;
+		height: 4px;
+		background: rgba(255, 255, 255, 0.3);
+		border-radius: 2px;
+		outline: none;
+		cursor: pointer;
+	}
+
+	.vp-volume-slider::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 12px;
+		height: 12px;
+		background: white;
+		border-radius: 50%;
+		cursor: pointer;
+		border: none;
+	}
+
+	.vp-volume-slider::-moz-range-thumb {
+		width: 12px;
+		height: 12px;
+		background: white;
+		border-radius: 50%;
+		cursor: pointer;
+		border: none;
+	}
+
+	.vp-repeat-btn {
+		position: relative;
+	}
+
+	.vp-repeat-badge {
+		position: absolute;
+		top: -2px;
+		right: -2px;
+		font-size: 0.5rem;
+		font-weight: 700;
+		color: var(--color-accent);
+		line-height: 1;
+	}
+
+	.vp-dl-pct {
+		color: rgba(255,255,255,0.7);
+		font-size: 0.75rem;
+	}
+
+	/* Resume overlay */
+	.vp-resume {
+		position: absolute;
+		bottom: 80px;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		z-index: 3;
+		animation: fadeIn 0.3s ease-out;
+	}
+
+	.vp-resume-btn {
+		background: var(--color-accent);
+		color: white;
+		border: none;
+		border-radius: var(--radius-pill);
+		padding: 0.5rem 1.25rem;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.vp-resume-btn:active {
+		opacity: 0.8;
+	}
+
+	.vp-resume-dismiss {
+		background: rgba(0,0,0,0.5);
+		border: none;
+		border-radius: 50%;
+		width: 28px;
+		height: 28px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: white;
+		cursor: pointer;
+	}
+
+	/* Info below video */
+	.vp-info {
+		padding: 1rem;
+	}
+
+	.vp-info-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		margin: 0 0 0.25rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.vp-info-subtitle {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.vp-offline-badge {
 		display: inline-block;
-		padding: 0.5rem 1.5rem;
+		padding: 0.2rem 0.6rem;
 		background: var(--color-surface);
-		color: var(--color-text);
-		text-decoration: none;
+		color: var(--color-text-muted);
 		border-radius: var(--radius-sm);
+		font-size: var(--font-size-sm);
+		margin-top: 0.5rem;
 	}
 
-	.btn:hover {
-		background: var(--color-surface-alt);
+	.vp-details {
+		margin-top: 0.75rem;
 	}
 
-	button.btn {
-		padding: 0.5rem 1.5rem;
+	.vp-details summary {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.vp-meta-grid {
+		margin: 0.5rem 0 0;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.25rem 1rem;
+		font-size: var(--font-size-sm);
+	}
+
+	.vp-meta-grid dt {
+		color: var(--color-text-muted);
+	}
+
+	.vp-meta-grid dd {
+		margin: 0;
+	}
+
+	.vp-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-top: 1rem;
+	}
+
+	.vp-action-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.5rem 1rem;
 		background: var(--color-surface);
 		color: var(--color-text);
 		border: none;
 		border-radius: var(--radius-sm);
 		cursor: pointer;
-		font-size: 1rem;
+		font-size: var(--font-size-sm);
 	}
 
-	.offline-badge {
-		display: inline-block;
-		padding: 0.25rem 0.75rem;
-		background: var(--color-surface);
-		color: var(--color-text-muted);
+	.vp-action-btn:active {
+		background: var(--color-surface-alt);
+	}
+
+	/* Video queue */
+	.vp-queue {
+		padding: 0.75rem 1rem 2rem;
+		border-top: 1px solid var(--color-surface-alt);
+	}
+
+	.vp-queue-title {
+		font-size: 1rem;
+		font-weight: 700;
+		margin: 0 0 0.5rem;
+		color: var(--color-text);
+	}
+
+	.vp-queue-list {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.vp-queue-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem;
 		border-radius: var(--radius-sm);
-		font-size: var(--font-size-sm);
-		margin-top: 0.75rem;
+		background: none;
+		border: none;
+		border-left: 3px solid transparent;
+		color: var(--color-text);
+		text-align: left;
+		cursor: pointer;
+		width: 100%;
+		font-size: var(--font-size-base);
+	}
+
+	.vp-queue-item:active {
+		background: var(--color-surface);
+	}
+
+	.vp-queue-current {
+		border-left-color: var(--color-accent);
+		background: var(--color-surface);
+	}
+
+	.vp-queue-thumb {
+		width: 56px;
+		height: 32px;
+		border-radius: 4px;
+		overflow: hidden;
+		background: var(--color-surface-alt);
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.vp-queue-thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.vp-queue-thumb-placeholder {
+		color: var(--color-text-muted);
+		opacity: 0.5;
+	}
+
+	.vp-queue-item-title {
+		flex: 1;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.vp-queue-remove {
+		background: none;
+		border: none;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		padding: 4px;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-sm);
+	}
+
+	.vp-queue-remove:active {
+		opacity: 0.6;
 	}
 
 	.downloaded-badge {

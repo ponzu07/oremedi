@@ -1,5 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { goto } from '$app/navigation';
+	import { playerStore } from '$lib/stores/player.svelte';
+	import { addToQueue } from '$lib/utils';
 
 	let { data }: { data: PageData } = $props();
 
@@ -53,12 +56,22 @@
 	let showLive = $derived(!data.currentSub || data.currentSub === 'live');
 	let showMovies = $derived(!data.currentSub || data.currentSub === 'movie');
 	let totalCount = $derived(data.movies.length + data.liveItems.length);
+
+	function playMovie(movie: any) {
+		playerStore.play(movie.id, movie.title, movie.category, movie.thumbnail_path ?? null);
+		goto(`/play/${movie.id}`);
+	}
+
+	function playLive(item: any) {
+		playerStore.play(item.id, item.title, item.category, item.thumbnail_path ?? null);
+		goto(`/play/${item.id}`);
+	}
+
 </script>
 
 <div class="list-page">
 	<header>
 		<h1>Video</h1>
-		<nav><a href="/">Home</a></nav>
 	</header>
 
 	<!-- Sub-category chips -->
@@ -118,20 +131,23 @@
 				<h3 class="section-title">Movies</h3>
 			{/if}
 			<div class="media-grid">
-				{#each data.movies as movie}
-					<a href="/play/{movie.id}" class="media-card">
-						<div class="thumb-wrap">
-							{#if movie.thumbnail_path}
-								<img src={`/api/media/${movie.id}/thumbnail`} alt={movie.title} />
-							{:else}
-								<div class="thumb-placeholder">&#9658;</div>
-							{/if}
-						</div>
-						<div class="media-info">
-							<span class="media-title">{movie.title}</span>
-							<span class="media-meta">{movie.genre_value ?? '-'}</span>
-						</div>
-					</a>
+				{#each data.movies as movie, i}
+					<div class="media-card-wrap" class:playing={playerStore.state.mediaId === movie.id}>
+						<button class="media-card" onclick={() => playMovie(movie)}>
+							<div class="thumb-wrap">
+								{#if movie.thumbnail_path}
+									<img src={`/api/media/${movie.id}/thumbnail`} alt={movie.title} />
+								{:else}
+									<div class="thumb-placeholder">&#9658;</div>
+								{/if}
+							</div>
+							<div class="media-info">
+								<span class="media-title">{movie.title}</span>
+								<span class="media-meta">{movie.genre_value ?? '-'}</span>
+							</div>
+						</button>
+						<button class="queue-add-btn" onclick={() => addToQueue(movie)} aria-label="Add to queue">+</button>
+					</div>
 				{/each}
 			</div>
 		{/if}
@@ -143,21 +159,24 @@
 				<!-- All mode: show live in grid view -->
 				<div class="media-grid">
 					{#each data.liveItems as item}
-						<a href="/play/{item.id}" class="media-card">
-							<div class="thumb-wrap">
-								{#if item.thumbnail_path}
-									<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} />
-								{:else}
-									<div class="thumb-placeholder">&#9658;</div>
-								{/if}
-							</div>
-							<div class="media-info">
-								<span class="media-title">{item.title}</span>
-								{#if item.meta?.event_name}
-									<span class="media-meta">{item.meta.event_name}</span>
-								{/if}
-							</div>
-						</a>
+						<div class="media-card-wrap" class:playing={playerStore.state.mediaId === item.id}>
+							<button class="media-card" onclick={() => playLive(item)}>
+								<div class="thumb-wrap">
+									{#if item.thumbnail_path}
+										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} />
+									{:else}
+										<div class="thumb-placeholder">&#9658;</div>
+									{/if}
+								</div>
+								<div class="media-info">
+									<span class="media-title">{item.title}</span>
+									{#if item.meta?.event_name}
+										<span class="media-meta">{item.meta.event_name}</span>
+									{/if}
+								</div>
+							</button>
+							<button class="queue-add-btn" onclick={() => addToQueue(item)} aria-label="Add to queue">+</button>
+						</div>
 					{/each}
 				</div>
 			{:else}
@@ -168,8 +187,8 @@
 					{/if}
 					<ul class="item-list">
 						{#each items as item}
-							<li>
-								<a href="/play/{item.id}" class="item-link">
+							<li class="item-row" class:playing={playerStore.state.mediaId === item.id}>
+								<button class="item-link" onclick={() => playLive(item)}>
 									{#if item.thumbnail_path}
 										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="thumb" />
 									{:else}
@@ -188,7 +207,10 @@
 											</div>
 										{/if}
 									</div>
-								</a>
+								</button>
+								<button class="queue-add-btn-list" onclick={() => addToQueue(item)} aria-label="Add to queue">
+									<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+								</button>
 							</li>
 						{/each}
 					</ul>
@@ -206,14 +228,7 @@
 	}
 
 	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
 		margin-bottom: 1.5rem;
-	}
-
-	header a {
-		color: var(--color-accent);
 	}
 
 	/* Sub-category chips */
@@ -311,14 +326,48 @@
 		gap: 1rem;
 	}
 
+	.media-card-wrap {
+		position: relative;
+	}
+
 	.media-card {
 		text-decoration: none;
 		color: inherit;
 		transition: transform 0.1s ease;
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-align: left;
+		width: 100%;
 	}
 
 	.media-card:active {
 		transform: scale(0.97);
+	}
+
+	.queue-add-btn {
+		position: absolute;
+		top: 4px;
+		right: 4px;
+		width: 28px;
+		height: 28px;
+		background: rgba(0, 0, 0, 0.6);
+		color: white;
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 1.1rem;
+		font-weight: 700;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+		z-index: 1;
+	}
+
+	.queue-add-btn:active {
+		background: var(--color-accent);
 	}
 
 	.thumb-wrap {
@@ -386,6 +435,16 @@
 		border-bottom: 1px solid var(--color-surface-alt);
 	}
 
+	.item-row {
+		display: flex;
+		align-items: center;
+	}
+
+	.item-row.playing {
+		background: var(--color-surface);
+		border-left: 3px solid var(--color-accent);
+	}
+
 	.item-link {
 		display: flex;
 		gap: 1rem;
@@ -393,10 +452,33 @@
 		text-decoration: none;
 		align-items: center;
 		transition: transform 0.1s ease;
+		background: none;
+		border: none;
+		cursor: pointer;
+		flex: 1;
+		min-width: 0;
+		color: inherit;
 	}
 
 	.item-link:active {
 		transform: scale(0.98);
+	}
+
+	.queue-add-btn-list {
+		background: none;
+		border: none;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		padding: 8px;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-sm);
+	}
+
+	.queue-add-btn-list:active {
+		color: var(--color-accent);
 	}
 
 	.thumb {
@@ -448,5 +530,10 @@
 		border-radius: var(--radius-pill);
 		font-size: 0.7rem;
 		color: var(--color-text-muted);
+	}
+
+	.playing .media-title,
+	.playing .item-title {
+		color: var(--color-accent);
 	}
 </style>

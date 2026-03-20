@@ -154,22 +154,6 @@ export async function removeDownload(mediaId: number): Promise<void> {
 	});
 }
 
-export async function checkIntegrity(): Promise<{ valid: number; corrupted: number }> {
-	const downloads = await listDownloads();
-	let valid = 0;
-	let corrupted = 0;
-
-	for (const entry of downloads) {
-		if (entry.status === 'downloaded' && entry.size > 0) {
-			valid++;
-		} else {
-			corrupted++;
-		}
-	}
-
-	return { valid, corrupted };
-}
-
 export function formatSize(bytes: number): string {
 	if (bytes === 0) return '0 B';
 	const k = 1024;

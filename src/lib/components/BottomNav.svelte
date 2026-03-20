@@ -6,7 +6,8 @@
 	const navItems = [
 		{ href: '/', label: 'Home', icon: 'home' },
 		{ href: '/video', label: 'Video', icon: 'video' },
-		{ href: '/audio', label: 'Audio', icon: 'audio' }
+		{ href: '/audio', label: 'Audio', icon: 'audio' },
+		{ href: '/more', label: 'More', icon: 'more' }
 	];
 
 	function isActive(href: string): boolean {
@@ -16,6 +17,10 @@
 		if (path.startsWith('/play/') && mediaCategory) {
 			if (href === '/video') return ['movie', 'live_video'].includes(mediaCategory);
 			if (href === '/audio') return ['music', 'voice'].includes(mediaCategory);
+		}
+
+		if (href === '/more') {
+			return path === '/more' || path.startsWith('/admin') || path.startsWith('/downloads');
 		}
 
 		return path.startsWith(href);
@@ -35,6 +40,10 @@
 					<path d="M9 18V5l12-2v13" />
 					<circle cx="6" cy="18" r="3" />
 					<circle cx="18" cy="16" r="3" />
+				{:else if item.icon === 'more'}
+					<circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
+					<circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+					<circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" />
 				{/if}
 			</svg>
 			<span class="label">{item.label}</span>

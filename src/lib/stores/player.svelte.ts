@@ -7,6 +7,10 @@ export interface QueueItem {
 	thumbnailPath: string | null;
 }
 
+export function isVideoCategory(category: string): boolean {
+	return category === 'movie' || category === 'live_video';
+}
+
 interface PlayerState {
 	mediaId: number | null;
 	title: string;
@@ -23,6 +27,9 @@ interface PlayerState {
 	shuffle: boolean;
 	shuffleOrder: number[];
 	playbackRate: number;
+	isFullPlayer: boolean;
+	muted: boolean;
+	volume: number;
 }
 
 function createPlayerStore() {
@@ -41,27 +48,74 @@ function createPlayerStore() {
 		repeatMode: 'off',
 		shuffle: false,
 		shuffleOrder: [],
-		playbackRate: 1.0
+		playbackRate: 1.0,
+		isFullPlayer: false,
+		muted: false,
+		volume: 1.0
 	});
 
 	let audioElement: HTMLAudioElement | null = null;
+	let videoElement: HTMLVideoElement | null = null;
+
+	function getActiveElement(): HTMLAudioElement | HTMLVideoElement | null {
+		return isVideoCategory(state.category) ? videoElement : audioElement;
+	}
 
 	function bindAudio(el: HTMLAudioElement) {
 		audioElement = el;
 		el.addEventListener('timeupdate', () => {
-			state.currentTime = el.currentTime;
+			if (!isVideoCategory(state.category)) {
+				state.currentTime = el.currentTime;
+			}
 		});
 		el.addEventListener('durationchange', () => {
-			state.duration = el.duration;
+			if (!isVideoCategory(state.category)) {
+				state.duration = el.duration;
+			}
 		});
 		el.addEventListener('play', () => {
-			state.isPlaying = true;
+			if (!isVideoCategory(state.category)) {
+				state.isPlaying = true;
+			}
 		});
 		el.addEventListener('pause', () => {
-			state.isPlaying = false;
+			if (!isVideoCategory(state.category)) {
+				state.isPlaying = false;
+			}
 		});
 		el.addEventListener('ended', () => {
-			next();
+			if (!isVideoCategory(state.category)) {
+				next();
+			}
+		});
+	}
+
+	function bindVideo(el: HTMLVideoElement) {
+		videoElement = el;
+		el.addEventListener('timeupdate', () => {
+			if (isVideoCategory(state.category)) {
+				state.currentTime = el.currentTime;
+			}
+		});
+		el.addEventListener('durationchange', () => {
+			if (isVideoCategory(state.category)) {
+				state.duration = el.duration;
+			}
+		});
+		el.addEventListener('play', () => {
+			if (isVideoCategory(state.category)) {
+				state.isPlaying = true;
+			}
+		});
+		el.addEventListener('pause', () => {
+			if (isVideoCategory(state.category)) {
+				state.isPlaying = false;
+			}
+		});
+		el.addEventListener('ended', () => {
+			if (isVideoCategory(state.category)) {
+				next();
+			}
 		});
 	}
 
@@ -92,14 +146,38 @@ function createPlayerStore() {
 		state.currentTime = 0;
 		state.duration = 0;
 
-		if (audioElement) {
-			audioElement.src = url;
-			try {
-				await audioElement.play();
-			} catch (e) {
-				console.warn('Playback failed:', e);
+		const isVideo = isVideoCategory(item.category);
+
+		if (isVideo) {
+			// Stop audio if it was playing
+			if (audioElement && !audioElement.paused) {
+				audioElement.pause();
+				audioElement.src = '';
 			}
-			audioElement.playbackRate = state.playbackRate;
+			if (videoElement) {
+				videoElement.src = url;
+				videoElement.playbackRate = state.playbackRate;
+				try {
+					await videoElement.play();
+				} catch (e) {
+					console.warn('Video playback failed:', e);
+				}
+			}
+		} else {
+			// Stop video if it was playing
+			if (videoElement && !videoElement.paused) {
+				videoElement.pause();
+				videoElement.src = '';
+			}
+			if (audioElement) {
+				audioElement.src = url;
+				audioElement.playbackRate = state.playbackRate;
+				try {
+					await audioElement.play();
+				} catch (e) {
+					console.warn('Audio playback failed:', e);
+				}
+			}
 		}
 	}
 
@@ -197,8 +275,9 @@ function createPlayerStore() {
 
 		// If more than 3 seconds in, seek to beginning
 		if (state.currentTime > 3) {
-			if (audioElement) {
-				audioElement.currentTime = 0;
+			const el = getActiveElement();
+			if (el) {
+				el.currentTime = 0;
 			}
 			return;
 		}
@@ -226,14 +305,16 @@ function createPlayerStore() {
 	}
 
 	function skipForward(seconds: number = 30) {
-		if (audioElement) {
-			audioElement.currentTime = Math.min(audioElement.currentTime + seconds, audioElement.duration || Infinity);
+		const el = getActiveElement();
+		if (el) {
+			el.currentTime = Math.min(el.currentTime + seconds, el.duration || Infinity);
 		}
 	}
 
 	function skipBackward(seconds: number = 15) {
-		if (audioElement) {
-			audioElement.currentTime = Math.max(audioElement.currentTime - seconds, 0);
+		const el = getActiveElement();
+		if (el) {
+			el.currentTime = Math.max(el.currentTime - seconds, 0);
 		}
 	}
 
@@ -260,6 +341,9 @@ function createPlayerStore() {
 		state.playbackRate = rate;
 		if (audioElement) {
 			audioElement.playbackRate = rate;
+		}
+		if (videoElement) {
+			videoElement.playbackRate = rate;
 		}
 	}
 
@@ -309,11 +393,12 @@ function createPlayerStore() {
 	}
 
 	function togglePlayPause() {
-		if (!audioElement) return;
-		if (audioElement.paused) {
-			audioElement.play();
+		const el = getActiveElement();
+		if (!el) return;
+		if (el.paused) {
+			el.play();
 		} else {
-			audioElement.pause();
+			el.pause();
 		}
 	}
 
@@ -321,6 +406,10 @@ function createPlayerStore() {
 		if (audioElement) {
 			audioElement.pause();
 			audioElement.src = '';
+		}
+		if (videoElement) {
+			videoElement.pause();
+			videoElement.src = '';
 		}
 		state.mediaId = null;
 		state.title = '';
@@ -334,12 +423,39 @@ function createPlayerStore() {
 		state.queue = [];
 		state.currentIndex = -1;
 		state.shuffleOrder = [];
+		state.isFullPlayer = false;
 	}
 
 	function seek(time: number) {
-		if (audioElement) {
-			audioElement.currentTime = time;
+		const el = getActiveElement();
+		if (el) {
+			el.currentTime = time;
 		}
+	}
+
+	function setFullPlayer(value: boolean) {
+		state.isFullPlayer = value;
+	}
+
+	function toggleMute() {
+		state.muted = !state.muted;
+		if (audioElement) audioElement.muted = state.muted;
+		if (videoElement) videoElement.muted = state.muted;
+	}
+
+	function setVolume(vol: number) {
+		state.volume = Math.max(0, Math.min(1, vol));
+		if (audioElement) audioElement.volume = state.volume;
+		if (videoElement) videoElement.volume = state.volume;
+		if (state.volume > 0 && state.muted) {
+			state.muted = false;
+			if (audioElement) audioElement.muted = false;
+			if (videoElement) videoElement.muted = false;
+		}
+	}
+
+	function getVideoElement(): HTMLVideoElement | null {
+		return videoElement;
 	}
 
 	return {
@@ -347,6 +463,7 @@ function createPlayerStore() {
 			return state;
 		},
 		bindAudio,
+		bindVideo,
 		play,
 		playQueue,
 		next,
@@ -362,7 +479,11 @@ function createPlayerStore() {
 		playFromQueue,
 		togglePlayPause,
 		stop,
-		seek
+		seek,
+		setFullPlayer,
+		getVideoElement,
+		toggleMute,
+		setVolume
 	};
 }
 

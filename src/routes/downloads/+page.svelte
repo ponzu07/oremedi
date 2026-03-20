@@ -8,6 +8,7 @@
 		formatSize,
 		type DownloadStatus
 	} from '$lib/download-manager';
+	import { categoryLabels } from '$lib/constants';
 
 	let downloads = $state<
 		{ id: number; title: string; category: string; status: DownloadStatus; size: number; downloadedAt: string }[]
@@ -35,18 +36,11 @@
 		'needs-redownload': 'Needs re-download'
 	};
 
-	const categoryLabels: Record<string, string> = {
-		movie: 'Movie',
-		live_video: 'Live Video',
-		voice: 'Voice',
-		music: 'Music'
-	};
 </script>
 
 <div class="downloads-page">
 	<header>
 		<h1>Downloads</h1>
-		<nav><a href="/">Home</a></nav>
 	</header>
 
 	<div class="storage-info">
@@ -91,14 +85,7 @@
 	}
 
 	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
 		margin-bottom: 1.5rem;
-	}
-
-	header a {
-		color: #4a9eff;
 	}
 
 	.storage-info {
