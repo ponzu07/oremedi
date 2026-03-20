@@ -23,7 +23,7 @@
 		if (typeof document !== 'undefined') {
 			document.documentElement.style.setProperty(
 				'--bottom-offset',
-				hasPlayer ? '116px' : '60px'
+				hasPlayer ? '120px' : '60px'
 			);
 		}
 	});
