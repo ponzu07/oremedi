@@ -94,7 +94,11 @@ function createPlayerStore() {
 
 		if (audioElement) {
 			audioElement.src = url;
-			await audioElement.play();
+			try {
+				await audioElement.play();
+			} catch (e) {
+				console.warn('Playback failed:', e);
+			}
 			audioElement.playbackRate = state.playbackRate;
 		}
 	}
