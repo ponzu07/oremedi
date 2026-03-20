@@ -1,7 +1,34 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { playerStore, type QueueItem } from '$lib/stores/player.svelte';
 
 	let { data }: { data: PageData } = $props();
+
+	function buildQueueItems(items: any[]): QueueItem[] {
+		return items.map(item => ({
+			mediaId: item.id,
+			title: item.title,
+			category: item.category,
+			thumbnailPath: item.thumbnail_path ?? null
+		}));
+	}
+
+	function playMusic(index: number) {
+		const queue = buildQueueItems(data.musicItems);
+		playerStore.playQueue(queue, index);
+	}
+
+	function playVoice(index: number) {
+		const queue = buildQueueItems(data.voiceItems);
+		playerStore.playQueue(queue, index);
+	}
+
+	function playAll(item: any) {
+		const allItems = [...data.musicItems, ...data.voiceItems];
+		const queue = buildQueueItems(allItems);
+		const index = allItems.findIndex(i => i.id === item.id);
+		playerStore.playQueue(queue, Math.max(0, index));
+	}
 
 	type GroupBy = 'none' | 'speaker' | 'tag';
 	let groupBy = $state<GroupBy>('none');
@@ -123,9 +150,9 @@
 				<h3 class="section-title">Music</h3>
 			{/if}
 			<ul class="item-list">
-				{#each data.musicItems as item}
+				{#each data.musicItems as item, i}
 					<li>
-						<a href="/play/{item.id}" class="item-link">
+						<button class="item-link" class:playing={playerStore.state.mediaId === item.id} onclick={() => data.currentSub === "music" ? playMusic(i) : playAll(item)}>
 							{#if item.thumbnail_path}
 								<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="thumb music-thumb" />
 							{:else}
@@ -140,7 +167,7 @@
 									{/if}
 								</span>
 							</div>
-						</a>
+						</button>
 					</li>
 				{/each}
 			</ul>
@@ -156,9 +183,9 @@
 					<h3 class="group-title">{groupName}</h3>
 				{/if}
 				<ul class="item-list">
-					{#each items as item}
+					{#each items as item, i}
 						<li>
-							<a href="/play/{item.id}" class="item-link">
+							<button class="item-link" class:playing={playerStore.state.mediaId === item.id} onclick={() => data.currentSub === "voice" ? playVoice(data.voiceItems.indexOf(item)) : playAll(item)}>
 								{#if item.thumbnail_path}
 									<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="thumb voice-thumb" />
 								{:else}
@@ -175,7 +202,7 @@
 										{/if}
 									</span>
 								</div>
-							</a>
+							</button>
 						</li>
 					{/each}
 				</ul>
@@ -316,10 +343,23 @@
 		text-decoration: none;
 		align-items: center;
 		transition: transform 0.1s ease;
+		width: 100%;
+		background: none;
+		border: none;
+		cursor: pointer;
+		font: inherit;
+		color: inherit;
+		text-align: left;
 	}
 
 	.item-link:active {
 		transform: scale(0.98);
+	}
+
+	.item-link.playing {
+		background: var(--color-surface);
+		border-left: 3px solid var(--color-accent);
+		padding-left: calc(0.6rem - 3px);
 	}
 
 	/* Thumbnails - 48x48 Spotify-style */
