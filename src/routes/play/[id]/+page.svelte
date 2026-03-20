@@ -190,9 +190,9 @@
 		gap: 0.25rem;
 		background: none;
 		border: none;
-		color: var(--color-accent, #5b9df5);
+		color: var(--color-accent);
 		cursor: pointer;
-		font-size: 0.9rem;
+		font-size: var(--font-size-base);
 		padding: 0;
 	}
 
@@ -203,8 +203,8 @@
 	video {
 		width: 100%;
 		max-height: 70vh;
-		background: #000;
-		border-radius: 8px;
+		background: var(--color-bg);
+		border-radius: var(--radius-md);
 	}
 
 	.audio-container {
@@ -217,9 +217,9 @@
 	.audio-art {
 		width: 300px;
 		height: 300px;
-		border-radius: 8px;
+		border-radius: var(--radius-md);
 		overflow: hidden;
-		background: #1a1a1a;
+		background: var(--color-surface-alt);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -233,7 +233,7 @@
 
 	.placeholder-art {
 		font-size: 5rem;
-		color: #444;
+		color: var(--color-text-muted);
 	}
 
 	.audio-controls {
@@ -248,10 +248,10 @@
 		justify-content: center;
 		width: 64px;
 		height: 64px;
-		background: var(--color-accent, #5b9df5);
+		background: var(--color-accent);
 		border: none;
 		border-radius: 50%;
-		color: var(--color-text, #fff);
+		color: var(--color-text);
 		cursor: pointer;
 	}
 
@@ -261,8 +261,8 @@
 	}
 
 	.category {
-		color: #888;
-		font-size: 0.875rem;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-base);
 	}
 
 	.tags {
@@ -274,10 +274,10 @@
 
 	.tag {
 		padding: 0.25rem 0.75rem;
-		background: #222;
-		border-radius: 100px;
-		font-size: 0.8rem;
-		color: #aaa;
+		background: var(--color-surface);
+		border-radius: var(--radius-pill);
+		font-size: var(--font-size-sm);
+		color: var(--color-text-secondary);
 	}
 
 	.metadata {
@@ -288,8 +288,8 @@
 	}
 
 	.metadata dt {
-		color: #888;
-		font-size: 0.875rem;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-base);
 	}
 
 	.metadata dd {
@@ -306,22 +306,22 @@
 	.btn {
 		display: inline-block;
 		padding: 0.5rem 1.5rem;
-		background: #333;
-		color: #fff;
+		background: var(--color-surface);
+		color: var(--color-text);
 		text-decoration: none;
-		border-radius: 4px;
+		border-radius: var(--radius-sm);
 	}
 
 	.btn:hover {
-		background: #444;
+		background: var(--color-surface-alt);
 	}
 
 	button.btn {
 		padding: 0.5rem 1.5rem;
-		background: #333;
-		color: #fff;
+		background: var(--color-surface);
+		color: var(--color-text);
 		border: none;
-		border-radius: 4px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		font-size: 1rem;
 	}
@@ -329,16 +329,16 @@
 	.offline-badge {
 		display: inline-block;
 		padding: 0.25rem 0.75rem;
-		background: #2a2a1a;
-		color: #aa8;
-		border-radius: 4px;
-		font-size: 0.8rem;
+		background: var(--color-surface);
+		color: var(--color-text-muted);
+		border-radius: var(--radius-sm);
+		font-size: var(--font-size-sm);
 		margin-top: 0.75rem;
 	}
 
 	.downloaded-badge {
-		color: #4a4;
-		font-size: 0.875rem;
+		color: var(--color-accent);
+		font-size: var(--font-size-base);
 	}
 
 	.download-progress {
@@ -352,14 +352,14 @@
 	.progress-bar {
 		flex: 1;
 		height: 6px;
-		background: #222;
-		border-radius: 3px;
+		background: var(--color-surface);
+		border-radius: var(--radius-sm);
 		overflow: hidden;
 	}
 
 	.progress-fill {
 		height: 100%;
-		background: #4a9eff;
+		background: var(--color-accent);
 		transition: width 0.2s;
 	}
 </style>
