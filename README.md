@@ -59,6 +59,8 @@ services:
       - /volume1/docker/oremedi/media-originals:/media-originals
       - oremedi-data:/data
     environment:
+      - PUID=1026
+      - PGID=100
       - PASSWORD=${PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - DATABASE_PATH=/data/oremedi.db
@@ -83,6 +85,8 @@ docker compose up -d
 
 | 変数 | 説明 | デフォルト |
 |------|------|-----------|
+| `PUID` | 実行ユーザーのUID（`id -u`で確認） | `0`（root） |
+| `PGID` | 実行グループのGID（`id -g`で確認） | `0`（root） |
 | `PASSWORD` | ログインパスワード | `oremedi` |
 | `JWT_SECRET` | JWT署名用シークレット（必ず変更） | — |
 | `DATABASE_PATH` | SQLiteのDBファイルパス | `data/oremedi.db` |

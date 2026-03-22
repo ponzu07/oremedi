@@ -10,6 +10,8 @@ services:
       - /volume1/docker/oremedi/media-originals:/media-originals
       - ./data:/data
     environment:
+      - PUID=1026
+      - PGID=100
       - PASSWORD=${PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - DATABASE_PATH=/data/oremedi.db
