@@ -22,15 +22,12 @@ export const load: PageServerLoad = async ({ params }) => {
 	`).all(params.id) as { id: number; name: string; category: string }[];
 
 	// Fetch all media in the same category for queue
-	let siblingMedia: { id: number; title: string; category: string; thumbnail_path: string | null }[] = [];
-	if (['music', 'voice', 'movie', 'live_video'].includes(media.category)) {
-		const orderClause = (media.category === 'movie' || media.category === 'live_video')
-			? 'ORDER BY created_at DESC'
-			: 'ORDER BY title';
-		siblingMedia = db.prepare(
-			`SELECT id, title, category, thumbnail_path FROM media WHERE category = ? ${orderClause}`
-		).all(media.category) as typeof siblingMedia;
-	}
+	const orderClause = (media.category === 'movie' || media.category === 'live_video')
+		? 'ORDER BY created_at DESC'
+		: 'ORDER BY title';
+	const siblingMedia = db.prepare(
+		`SELECT id, title, category, thumbnail_path FROM media WHERE category = ? ${orderClause}`
+	).all(media.category) as { id: number; title: string; category: string; thumbnail_path: string | null }[];
 
 	return { media: { ...media, metadata, tags }, siblingMedia };
 };

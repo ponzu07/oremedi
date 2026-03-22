@@ -25,6 +25,11 @@ export function addToQueue(item: {
 	toast.show(`"${item.title}" をキューに追加`);
 }
 
+export function logout() {
+	document.cookie = 'auth_token=; Max-Age=0; path=/';
+	window.location.href = '/login';
+}
+
 export function formatDuration(seconds: number | null): string {
 	if (!seconds) return '-';
 	const m = Math.floor(seconds / 60);

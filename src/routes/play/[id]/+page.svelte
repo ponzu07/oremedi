@@ -266,20 +266,17 @@
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	}
 
-	let tagsText = $derived(
-		(() => {
-			const parts: string[] = [];
-			const cat = categoryLabels[media.category] ?? (media.category);
-			if (cat) parts.push(cat);
-			if (media.tags && (media.tags as any[]).length > 0) {
-				parts.push(...(media.tags as any[]).map((t: any) => t.name));
-			}
-			return parts.join(' · ');
-		})()
-	);
+	const tagsText = (() => {
+		const parts: string[] = [];
+		const cat = categoryLabels[media.category];
+		if (cat) parts.push(cat);
+		if (media.tags && (media.tags as any[]).length > 0) {
+			parts.push(...(media.tags as any[]).map((t: any) => t.name));
+		}
+		return parts.join(' · ');
+	})();
 
 	const pipSupported = document.pictureInPictureEnabled;
-	const fullscreenSupported = document.fullscreenEnabled;
 </script>
 
 {#if isVideo}
@@ -453,16 +450,14 @@
 					</button>
 				{/if}
 
-				{#if fullscreenSupported}
-					<button class="vp-btn" onclick={toggleFullscreen} aria-label="Fullscreen">
-						<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-							<polyline points="15 3 21 3 21 9" />
-							<polyline points="9 21 3 21 3 15" />
-							<line x1="21" y1="3" x2="14" y2="10" />
-							<line x1="3" y1="21" x2="10" y2="14" />
-						</svg>
-					</button>
-				{/if}
+				<button class="vp-btn" onclick={toggleFullscreen} aria-label="Fullscreen">
+					<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<polyline points="15 3 21 3 21 9" />
+						<polyline points="9 21 3 21 3 15" />
+						<line x1="21" y1="3" x2="14" y2="10" />
+						<line x1="3" y1="21" x2="10" y2="14" />
+					</svg>
+				</button>
 
 				<button class="vp-btn vp-repeat-btn" class:vp-active={playerStore.state.repeatMode !== 'off'} onclick={() => playerStore.setRepeatMode()} aria-label="Repeat">
 					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

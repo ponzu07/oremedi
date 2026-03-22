@@ -10,12 +10,12 @@ export const GET: RequestHandler = async () => {
 	).get() as { count: number };
 
 	const processing = db.prepare(
-		"SELECT * FROM media WHERE transcode_status = 'processing'"
-	).all();
+		"SELECT COUNT(*) as count FROM media WHERE transcode_status = 'processing'"
+	).get() as { count: number };
 
 	const failed = db.prepare(
-		"SELECT * FROM media WHERE transcode_status = 'failed'"
-	).all();
+		"SELECT COUNT(*) as count FROM media WHERE transcode_status = 'failed'"
+	).get() as { count: number };
 
 	const queue = db.prepare(
 		"SELECT id, title, transcode_status FROM media WHERE transcode_status IN ('pending', 'processing') ORDER BY created_at"
@@ -23,8 +23,8 @@ export const GET: RequestHandler = async () => {
 
 	return json({
 		pending: pending.count,
-		processing: processing.length,
-		failed: failed.length,
+		processing: processing.count,
+		failed: failed.count,
 		queue
 	});
 };

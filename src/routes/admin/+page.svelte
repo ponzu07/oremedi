@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { categoryLabels } from '$lib/constants';
+	import { logout } from '$lib/utils';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { RefreshCw, Plus, X, Pencil, Trash2, RotateCcw, LogOut } from 'lucide-svelte';
 
@@ -101,10 +102,6 @@
 		}
 	}
 
-	function logout() {
-		document.cookie = 'auth_token=; Max-Age=0; path=/';
-		window.location.href = '/login';
-	}
 
 	const statusLabels: Record<string, string> = {
 		pending: '待機中',
