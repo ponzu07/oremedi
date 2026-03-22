@@ -152,7 +152,7 @@
 	});
 
 	onDestroy(() => {
-		if (isVideo) {
+		if (isVideo && typeof window !== 'undefined') {
 			playerStore.setFullPlayer(false);
 			saveResumePosition();
 			stopResumeInterval();
