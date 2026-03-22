@@ -66,7 +66,7 @@
 						<span class="text-xs text-base-content/50">
 							{categoryLabels[item.category] ?? item.category} — {formatSize(item.size)}
 						</span>
-						<span class="text-xs {item.status === 'downloaded' ? 'text-success' : item.status === 'needs-redownload' ? 'text-error' : 'text-base-content/50'}">
+						<span class="text-xs {item.status === 'downloaded' ? 'text-success' : 'text-error'}">
 							{statusLabels[item.status]}
 						</span>
 					</div>
