@@ -1,4 +1,4 @@
-import { getDownloadedMedia, getDownloadedMediaUrl } from '$lib/download-manager';
+import { getDownloadedMedia } from '$lib/download-manager';
 
 export interface QueueItem {
 	mediaId: number;
@@ -129,11 +129,8 @@ function createPlayerStore() {
 		if (!navigator.onLine) {
 			const downloaded = await getDownloadedMedia(item.mediaId);
 			if (downloaded) {
-				const offlineUrl = await getDownloadedMediaUrl(item.mediaId);
-				if (offlineUrl) {
-					url = offlineUrl;
-					offline = true;
-				}
+				url = URL.createObjectURL(downloaded.blob);
+				offline = true;
 			}
 		}
 

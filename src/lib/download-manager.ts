@@ -115,12 +115,6 @@ export async function getDownloadedMedia(mediaId: number): Promise<DownloadedMed
 	});
 }
 
-export async function getDownloadedMediaUrl(mediaId: number): Promise<string | null> {
-	const media = await getDownloadedMedia(mediaId);
-	if (!media) return null;
-	return URL.createObjectURL(media.blob);
-}
-
 export async function listDownloads(): Promise<DownloadEntry[]> {
 	const db = await openDB();
 	const tx = db.transaction(STORE_NAME, 'readonly');

@@ -33,6 +33,7 @@
 	}
 
 	let groups = $derived(getGroups(data.items, groupBy));
+	const itemIndexMap = new Map(data.items.map((item, i) => [item, i]));
 
 	function playVoice(index: number) {
 		playerStore.playQueue(data.items.map(buildQueueItem), index);
@@ -63,7 +64,7 @@
 				{#each items as item}
 					<MediaListItem
 						media={item}
-						onPlay={() => playVoice(data.items.indexOf(item))}
+						onPlay={() => playVoice(itemIndexMap.get(item)!)}
 						onQueue={() => addToQueue(item)}
 						metaText="{formatDuration(item.duration)}{item.tags?.length > 0 ? ` — ${(item.tags as { name: string; category: string }[]).map((t) => t.name).join(', ')}` : ''}"
 						thumbnailShape="circle"

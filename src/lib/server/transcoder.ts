@@ -12,7 +12,7 @@ interface MediaRow {
 	title: string;
 }
 
-export function startTranscodeWorker(db: Database.Database, convertedPath: string) {
+export function startTranscodeWorker(db: Database.Database, mediaPath: string, convertedPath: string) {
 	const processNext = () => {
 		const next = db.prepare(
 			"SELECT id, original_path, title FROM media WHERE transcode_status = 'pending' ORDER BY created_at LIMIT 1"
@@ -27,7 +27,7 @@ export function startTranscodeWorker(db: Database.Database, convertedPath: strin
 
 		const ext = path.extname(next.original_path).toLowerCase();
 		const isAudio = AUDIO_ONLY.has(ext);
-		const relativePath = path.relative('/media', next.original_path);
+		const relativePath = path.relative(mediaPath, next.original_path);
 		const outputDir = path.join(convertedPath, path.dirname(relativePath));
 		const baseName = path.basename(next.original_path, ext);
 
