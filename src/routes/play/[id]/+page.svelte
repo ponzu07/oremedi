@@ -35,6 +35,7 @@
 
 	// Sync seekValue from store when not seeking (audio)
 	$effect(() => {
+		if (isVideo) return;
 		if (!isSeeking) {
 			seekValue = playerStore.state.currentTime;
 		}
