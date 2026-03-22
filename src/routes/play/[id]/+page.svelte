@@ -129,7 +129,7 @@
 					mediaId: s.id,
 					title: s.title,
 					category: s.category,
-					thumbnailPath: s.thumbnail_path ?? null
+					thumbnailPath: s.thumbnail_path
 				}));
 				const startIndex = siblings.findIndex(s => s.id === media.id);
 				await playerStore.playQueue(queue, Math.max(0, startIndex));
@@ -276,7 +276,7 @@
 		return parts.join(' · ');
 	})();
 
-	const pipSupported = document.pictureInPictureEnabled;
+	const pipSupported = typeof document !== 'undefined' && document.pictureInPictureEnabled;
 </script>
 
 {#if isVideo}
