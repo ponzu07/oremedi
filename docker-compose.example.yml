@@ -1,0 +1,20 @@
+services:
+  oremedi:
+    image: ghcr.io/ponzu07/oremedi:main
+    ports:
+      - "3000:3000"
+    volumes:
+      - /volume1/media:/media
+      - /volume1/media-converted:/media-converted
+      - oremedi-data:/data
+    environment:
+      - PASSWORD=oremedi
+      - JWT_SECRET=change_me_to_a_random_string
+      - DATABASE_PATH=/data/oremedi.db
+      - MEDIA_PATH=/media
+      - CONVERTED_PATH=/media-converted
+      - BODY_SIZE_LIMIT=Infinity
+    restart: unless-stopped
+
+volumes:
+  oremedi-data:
