@@ -7,7 +7,6 @@ interface DownloadedMedia {
 	title: string;
 	category: string;
 	blob: Blob;
-	mimeType: string;
 	downloadedAt: string;
 	size: number;
 }
@@ -91,7 +90,6 @@ export async function downloadMedia(
 		title,
 		category,
 		blob,
-		mimeType: contentType,
 		downloadedAt: new Date().toISOString(),
 		size: blob.size
 	};

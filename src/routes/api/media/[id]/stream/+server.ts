@@ -7,12 +7,11 @@ interface MediaRow {
 	id: number;
 	original_path: string;
 	converted_path: string | null;
-	transcode_status: string;
 }
 
 export const GET: RequestHandler = async ({ params, request }) => {
 	const db = getDb();
-	const media = db.prepare('SELECT id, original_path, converted_path, transcode_status FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
+	const media = db.prepare('SELECT id, original_path, converted_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
 
 	if (!media) {
 		return new Response('Not found', { status: 404 });
