@@ -14,14 +14,3 @@ export interface Media {
 	created_at: string;
 	updated_at: string;
 }
-
-export interface Tag {
-	id: number;
-	name: string;
-	category: 'artist' | 'speaker' | 'genre' | 'custom';
-}
-
-export interface MediaMetadata {
-	key: string;
-	value: string;
-}

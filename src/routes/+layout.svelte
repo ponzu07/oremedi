@@ -28,13 +28,11 @@
 	});
 
 	$effect(() => {
-		if (typeof document !== 'undefined') {
-			let offset = '56px';
-			if (hasPlayer) {
-				offset = isCurrentVideo ? '128px' : '116px';
-			}
-			document.documentElement.style.setProperty('--bottom-offset', offset);
+		let offset = '56px';
+		if (hasPlayer) {
+			offset = isCurrentVideo ? '128px' : '116px';
 		}
+		document.documentElement.style.setProperty('--bottom-offset', offset);
 	});
 </script>
 

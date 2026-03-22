@@ -63,7 +63,7 @@ export async function downloadMedia(
 	const response = await fetch(`/api/media/${mediaId}/download`);
 	if (!response.ok) throw new Error('Download failed');
 
-	const contentLength = Number(response.headers.get('content-length') ?? 0);
+	const contentLength = Number(response.headers.get('content-length'));
 	const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
 	const reader = response.body?.getReader();
 

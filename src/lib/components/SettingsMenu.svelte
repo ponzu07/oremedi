@@ -11,7 +11,7 @@
 		<li><a href="/admin">Admin</a></li>
 		<li>
 			<button onclick={() => {
-				document.cookie = 'token=; Max-Age=0; path=/';
+				document.cookie = 'auth_token=; Max-Age=0; path=/';
 				window.location.href = '/login';
 			}}>
 				<LogOut size={16} />

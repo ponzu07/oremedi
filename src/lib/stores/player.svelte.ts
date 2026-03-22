@@ -126,7 +126,7 @@ function createPlayerStore() {
 		let url = `/api/media/${item.mediaId}/stream`;
 		let offline = false;
 
-		if (typeof window !== 'undefined' && !navigator.onLine) {
+		if (!navigator.onLine) {
 			const downloaded = await getDownloadedMedia(item.mediaId);
 			if (downloaded) {
 				const offlineUrl = await getDownloadedMediaUrl(item.mediaId);

@@ -6,7 +6,6 @@
 	import { playerStore, type QueueItem, isVideoCategory } from '$lib/stores/player.svelte';
 	import {
 		downloadMedia,
-		getDownloadedMediaUrl,
 		getDownloadedMedia,
 		formatSize
 	} from '$lib/download-manager';
@@ -15,7 +14,7 @@
 	let { data }: { data: PageData } = $props();
 	const media = data.media;
 
-	const isVideo = ['movie', 'live_video'].includes(media.category as string);
+	const isVideo = ['movie', 'live_video'].includes(media.category);
 
 	let isDownloaded = $state(false);
 	let downloading = $state(false);
@@ -81,12 +80,8 @@
 		if (!isVideo) return;
 		const time = playerStore.state.currentTime;
 		if (time > 10) {
-			localStorage.setItem(getResumeKey(media.id as number), JSON.stringify({ time, updatedAt: Date.now() }));
+			localStorage.setItem(getResumeKey(media.id), JSON.stringify({ time, updatedAt: Date.now() }));
 		}
-	}
-
-	function clearResumePosition() {
-		localStorage.removeItem(getResumeKey(media.id as number));
 	}
 
 	function startResumeInterval() {
@@ -106,17 +101,17 @@
 			playerStore.setFullPlayer(true);
 
 			// If this media is already playing (came from video page), don't restart
-			if (playerStore.state.mediaId !== (media.id as number)) {
+			if (playerStore.state.mediaId !== (media.id)) {
 				await playerStore.play(
-					media.id as number,
-					media.title as string,
-					media.category as string,
-					media.thumbnail_path as string | null
+					media.id,
+					media.title,
+					media.category,
+					media.thumbnail_path
 				);
 			}
 
 			// Check for resume position
-			const saved = localStorage.getItem(getResumeKey(media.id as number));
+			const saved = localStorage.getItem(getResumeKey(media.id));
 			if (saved) {
 				try {
 					const { time } = JSON.parse(saved);
@@ -141,16 +136,16 @@
 				await playerStore.playQueue(queue, Math.max(0, startIndex));
 			} else {
 				await playerStore.play(
-					media.id as number,
-					media.title as string,
-					media.category as string,
-					media.thumbnail_path as string | null
+					media.id,
+					media.title,
+					media.category,
+					media.thumbnail_path
 				);
 			}
 		}
 
 		// Check if already downloaded
-		const existing = await getDownloadedMedia(media.id as number);
+		const existing = await getDownloadedMedia(media.id);
 		if (existing) {
 			isDownloaded = true;
 		}
@@ -239,7 +234,7 @@
 		if (document.referrer && new URL(document.referrer).origin === location.origin) {
 			history.back();
 		} else {
-			goto(isVideo ? '/video' : (media.category as string) === 'voice' ? '/voice' : '/music');
+			goto(isVideo ? '/video' : media.category === 'voice' ? '/voice' : '/music');
 		}
 	}
 
@@ -248,9 +243,9 @@
 		downloadProgress = 0;
 		try {
 			await downloadMedia(
-				media.id as number,
-				media.title as string,
-				media.category as string,
+				media.id,
+				media.title,
+				media.category,
 				(loaded, total) => {
 					downloadProgress = total > 0 ? (loaded / total) * 100 : 0;
 				}
@@ -275,7 +270,7 @@
 	let tagsText = $derived(
 		(() => {
 			const parts: string[] = [];
-			const cat = categoryLabels[media.category as string] ?? (media.category as string);
+			const cat = categoryLabels[media.category] ?? (media.category);
 			if (cat) parts.push(cat);
 			if (media.tags && (media.tags as any[]).length > 0) {
 				parts.push(...(media.tags as any[]).map((t: any) => t.name));
@@ -284,8 +279,8 @@
 		})()
 	);
 
-	let pipSupported = $derived(typeof document !== 'undefined' && document.pictureInPictureEnabled);
-	let fullscreenSupported = $derived(typeof document !== 'undefined' && document.fullscreenEnabled);
+	let pipSupported = $derived(document.pictureInPictureEnabled);
+	let fullscreenSupported = $derived(document.fullscreenEnabled);
 </script>
 
 {#if isVideo}
@@ -408,7 +403,7 @@
 					</button>
 				{/if}
 
-				<CastButton mediaId={media.id as number} title={media.title as string} {isVideo} />
+				<CastButton mediaId={media.id} title={media.title} {isVideo} />
 
 				<div class="vp-volume-group">
 					<button class="vp-btn" onclick={() => playerStore.toggleMute()} aria-label={playerStore.state.muted ? 'Unmute' : 'Mute'}>
@@ -744,7 +739,7 @@
 			<button class="amp-sub-btn" onclick={() => playerStore.cyclePlaybackRate()}>
 				{playerStore.state.playbackRate.toFixed(playerStore.state.playbackRate % 1 === 0 ? 1 : 2)}x
 			</button>
-			<CastButton mediaId={media.id as number} title={media.title as string} {isVideo} />
+			<CastButton mediaId={media.id} title={media.title} {isVideo} />
 			{#if downloading}
 				<div class="download-progress">
 					<div class="progress-bar">

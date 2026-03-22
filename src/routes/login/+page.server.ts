@@ -6,7 +6,7 @@ import { config } from '$lib/server/config';
 export const actions: Actions = {
 	default: async ({ request, cookies }) => {
 		const data = await request.formData();
-		const password = data.get('password') as string;
+		const password = data.get('password');
 
 		if (!password) {
 			return fail(400, { error: 'Password is required' });

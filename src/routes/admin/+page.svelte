@@ -102,7 +102,7 @@
 	}
 
 	function logout() {
-		document.cookie = 'token=; Max-Age=0; path=/';
+		document.cookie = 'auth_token=; Max-Age=0; path=/';
 		window.location.href = '/login';
 	}
 
