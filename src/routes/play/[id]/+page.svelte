@@ -9,6 +9,7 @@
 		getDownloadedMedia
 	} from '$lib/download-manager';
 	import { categoryLabels } from '$lib/constants';
+	import { formatDuration } from '$lib/utils';
 
 	let { data }: { data: PageData } = $props();
 	const media = data.media;
@@ -258,14 +259,7 @@
 		downloading = false;
 	}
 
-	function formatTime(seconds: number): string {
-		if (!seconds || !isFinite(seconds)) return '0:00';
-		const h = Math.floor(seconds / 3600);
-		const m = Math.floor((seconds % 3600) / 60);
-		const s = Math.floor(seconds % 60);
-		if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-		return `${m}:${s.toString().padStart(2, '0')}`;
-	}
+	const formatTime = formatDuration;
 
 	const tagsText = (() => {
 		const parts: string[] = [];

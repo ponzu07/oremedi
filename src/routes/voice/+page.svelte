@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { playerStore } from '$lib/stores/player.svelte';
-	import { addToQueue, buildQueueItem, formatDuration } from '$lib/utils';
+	import { addToQueue, buildQueueItem, formatDuration, getGroups } from '$lib/utils';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import FilterPills from '$lib/components/FilterPills.svelte';
 	import GroupToggle from '$lib/components/GroupToggle.svelte';
@@ -11,26 +11,6 @@
 
 	type GroupBy = 'none' | 'speaker' | 'tag';
 	let groupBy = $state<GroupBy>('none');
-
-	function getGroups(items: any[], by: GroupBy): Map<string, any[]> {
-		if (by === 'none') {
-			return new Map([['All', items]]);
-		}
-		const groups = new Map<string, any[]>();
-		for (const item of items) {
-			let key: string;
-			if (by === 'speaker') {
-				const speakerTags = item.tags?.filter((t: any) => t.category === 'speaker') ?? [];
-				key = speakerTags.map((t: any) => t.name).join(', ') || 'Unknown';
-			} else {
-				const customTags = item.tags?.filter((t: any) => t.category === 'custom') ?? [];
-				key = customTags.map((t: any) => t.name).join(', ') || 'Untagged';
-			}
-			if (!groups.has(key)) groups.set(key, []);
-			groups.get(key)!.push(item);
-		}
-		return new Map([...groups.entries()].sort());
-	}
 
 	let groups = $derived(getGroups(data.items, groupBy));
 	const itemIndexMap = $derived(new Map(data.items.map((item, i) => [item, i])));

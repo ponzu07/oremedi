@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { playerStore } from '$lib/stores/player.svelte';
-	import { addToQueue } from '$lib/utils';
+	import { addToQueue, getGroups } from '$lib/utils';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import FilterPills from '$lib/components/FilterPills.svelte';
 	import GroupToggle from '$lib/components/GroupToggle.svelte';
@@ -22,29 +22,6 @@
 			groupBy = 'none';
 		}
 	});
-
-	function getGroups(items: any[], by: GroupBy): Map<string, any[]> {
-		if (by === 'none') {
-			return new Map([['All', items]]);
-		}
-
-		const groups = new Map<string, any[]>();
-		for (const item of items) {
-			let key: string;
-			if (by === 'artist') {
-				const artistTags = item.tags?.filter((t: any) => t.category === 'artist') ?? [];
-				key = artistTags.map((t: any) => t.name).join(', ') || 'Unknown';
-			} else if (by === 'event') {
-				key = item.meta?.event_name ?? 'Unknown Event';
-			} else {
-				key = item.meta?.date ?? item.created_at?.split('T')[0] ?? 'Unknown';
-			}
-
-			if (!groups.has(key)) groups.set(key, []);
-			groups.get(key)!.push(item);
-		}
-		return new Map([...groups.entries()].sort());
-	}
 
 	let liveGroups = $derived(getGroups(data.liveItems, groupBy));
 

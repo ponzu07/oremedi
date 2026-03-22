@@ -31,8 +31,38 @@ export function logout() {
 }
 
 export function formatDuration(seconds: number | null): string {
-	if (!seconds) return '-';
-	const m = Math.floor(seconds / 60);
-	const s = seconds % 60;
-	return `${m}:${String(s).padStart(2, '0')}`;
+	if (!seconds || !isFinite(seconds)) return '-';
+	const h = Math.floor(seconds / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
+	const s = Math.floor(seconds % 60);
+	if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+	return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+export function getGroups(
+	items: any[],
+	by: string,
+	tagCategory?: string
+): Map<string, any[]> {
+	if (by === 'none') {
+		return new Map([['All', items]]);
+	}
+
+	const groups = new Map<string, any[]>();
+	for (const item of items) {
+		let key: string;
+		if (by === 'event') {
+			key = item.meta?.event_name ?? 'Unknown Event';
+		} else if (by === 'date') {
+			key = item.meta?.date ?? item.created_at?.split('T')[0] ?? 'Unknown';
+		} else {
+			// Group by tag category (artist, speaker, custom, etc.)
+			const category = tagCategory ?? by;
+			const matchingTags = item.tags?.filter((t: any) => t.category === category) ?? [];
+			key = matchingTags.map((t: any) => t.name).join(', ') || 'Unknown';
+		}
+		if (!groups.has(key)) groups.set(key, []);
+		groups.get(key)!.push(item);
+	}
+	return new Map([...groups.entries()].sort());
 }
