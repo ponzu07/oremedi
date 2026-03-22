@@ -35,6 +35,16 @@
 	let thumbnailInput: HTMLInputElement | undefined = $state();
 	let uploadingThumbnail = $state(false);
 
+	interface EditChapter {
+		start_time: number;
+		end_time: number;
+		title: string;
+	}
+	let editChapters = $state<EditChapter[]>([]);
+	let showChapterEditor = $state(false);
+	let loadingChapters = $state(false);
+	let savingChapters = $state(false);
+
 	let availableTags = $derived.by(() => {
 		return data.allTags
 			.filter(t => t.category === newTagCategory)
@@ -187,11 +197,57 @@
 		}
 	}
 
-	function startEdit(item: any) {
+	async function startEdit(item: any) {
 		editingId = item.id;
 		editTitle = item.title;
 		editCategory = item.category;
 		editTags = item.tags ? [...item.tags] : [];
+		editChapters = [];
+		showChapterEditor = false;
+	}
+
+	async function loadChapters(id: number) {
+		loadingChapters = true;
+		const res = await fetch(`/api/media/${id}/chapters`);
+		editChapters = await res.json();
+		loadingChapters = false;
+		showChapterEditor = true;
+	}
+
+	function addChapter() {
+		const lastEnd = editChapters.length > 0 ? editChapters[editChapters.length - 1].end_time : 0;
+		editChapters = [...editChapters, { start_time: lastEnd, end_time: lastEnd + 60, title: '' }];
+	}
+
+	function removeChapter(index: number) {
+		editChapters = editChapters.filter((_, i) => i !== index);
+	}
+
+	function parseTimeInput(value: string): number {
+		const parts = value.split(':').map(Number);
+		if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+		if (parts.length === 2) return parts[0] * 60 + parts[1];
+		return Number(value) || 0;
+	}
+
+	function formatTimeInput(seconds: number): string {
+		const h = Math.floor(seconds / 3600);
+		const m = Math.floor((seconds % 3600) / 60);
+		const s = Math.floor(seconds % 60);
+		if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+		return `${m}:${String(s).padStart(2, '0')}`;
+	}
+
+	async function saveChapters(id: number) {
+		savingChapters = true;
+		await fetch(`/api/media/${id}/chapters`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(editChapters.filter(c => c.title.trim()))
+		});
+		savingChapters = false;
+		toast.show('チャプターを保存しました');
+		location.reload();
 	}
 
 	function addExistingTag(tag: { name: string; category: string }) {
@@ -554,6 +610,55 @@
 								<button type="button" class="btn btn-sm btn-ghost btn-block" onclick={() => (showNewTagInput = true)}>+ 新しいタグを作成</button>
 							{/if}
 						</div>
+						<!-- Chapters -->
+						{#if item.category === 'movie' || item.category === 'live_video'}
+							<div class="flex flex-col gap-1">
+								<div class="flex items-center justify-between">
+									<span class="text-xs text-base-content/50">チャプター {(item as any).chapterCount > 0 ? `(${(item as any).chapterCount}件)` : ''}</span>
+									{#if !showChapterEditor}
+										<button type="button" class="btn btn-xs btn-ghost" onclick={() => loadChapters(item.id)} disabled={loadingChapters}>
+											{loadingChapters ? '読込中...' : '編集'}
+										</button>
+									{/if}
+								</div>
+								{#if showChapterEditor}
+									<div class="flex flex-col gap-1.5 bg-base-300/50 rounded-lg p-2">
+										{#each editChapters as chapter, i}
+											<div class="flex items-center gap-1.5">
+												<input
+													class="input input-sm w-[70px] font-mono text-xs"
+													value={formatTimeInput(chapter.start_time)}
+													placeholder="0:00"
+													onchange={(e) => { editChapters[i].start_time = parseTimeInput((e.target as HTMLInputElement).value); }}
+												/>
+												<span class="text-xs text-base-content/30">-</span>
+												<input
+													class="input input-sm w-[70px] font-mono text-xs"
+													value={formatTimeInput(chapter.end_time)}
+													placeholder="0:00"
+													onchange={(e) => { editChapters[i].end_time = parseTimeInput((e.target as HTMLInputElement).value); }}
+												/>
+												<input
+													class="input input-sm flex-1"
+													placeholder="チャプター名"
+													bind:value={chapter.title}
+												/>
+												<button type="button" class="btn btn-ghost btn-xs" onclick={() => removeChapter(i)}>
+													<X size={14} />
+												</button>
+											</div>
+										{/each}
+										<div class="flex gap-2">
+											<button type="button" class="btn btn-xs btn-ghost flex-1" onclick={addChapter}>+ チャプター追加</button>
+											<button type="button" class="btn btn-xs btn-primary" onclick={() => saveChapters(item.id)} disabled={savingChapters}>
+												{savingChapters ? '保存中...' : 'チャプター保存'}
+											</button>
+										</div>
+									</div>
+								{/if}
+							</div>
+						{/if}
+
 						<div class="flex gap-2 justify-end">
 							<button class="btn btn-ghost btn-sm" onclick={() => (editingId = null)}>キャンセル</button>
 							<button class="btn btn-primary btn-sm" onclick={() => saveEdit(item.id)}>保存</button>
