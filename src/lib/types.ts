@@ -1,6 +1,6 @@
-export type MediaCategory = 'movie' | 'live_video' | 'voice' | 'music';
+type MediaCategory = 'movie' | 'live_video' | 'voice' | 'music';
 
-export type TranscodeStatus = 'pending' | 'processing' | 'ready' | 'failed' | 'skipped';
+type TranscodeStatus = 'pending' | 'processing' | 'ready' | 'failed' | 'skipped';
 
 export interface Media {
 	id: number;
