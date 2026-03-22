@@ -21,19 +21,25 @@
 			castAvailable = true;
 		};
 
-		// Load Cast SDK script if not already loaded
-		if (!(window as any).__castSDKLoaded) {
+		// Already loaded in a previous component mount
+		if ((window as any).__castSDKLoaded) {
+			initCast();
+			return;
+		}
+
+		// Set callback BEFORE loading script (Google's recommended pattern)
+		(window as any).__onGCastApiAvailable = (isAvailable: boolean) => {
+			if (isAvailable) {
+				(window as any).__castSDKLoaded = true;
+				initCast();
+			}
+		};
+
+		// Load Cast SDK script if not already loading
+		if (!document.querySelector('script[src*="cast_sender"]')) {
 			const script = document.createElement('script');
 			script.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
-			script.onload = () => {
-				(window as any).__castSDKLoaded = true;
-				(window as any).__onGCastApiAvailable = (isAvailable: boolean) => {
-					if (isAvailable) initCast();
-				};
-			};
 			document.head.appendChild(script);
-		} else {
-			initCast();
 		}
 	});
 
