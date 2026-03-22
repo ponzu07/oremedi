@@ -5,9 +5,15 @@ import type Database from 'better-sqlite3';
 import { computeFileHash } from '$lib/server/file-hash';
 import { extractChapters, saveChapters } from '$lib/server/chapters';
 
-const BROWSER_COMPATIBLE = new Set(['.mp4']);
 const AUDIO_ONLY = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma']);
 const BROWSER_COMPATIBLE_AUDIO = new Set(['.mp3', '.aac', '.ogg', '.m4a']);
+
+// Video codecs that browsers can play
+const COMPATIBLE_VIDEO_CODECS = new Set(['h264', 'hevc', 'h265', 'vp8', 'vp9', 'av1']);
+// Audio codecs that browsers can play
+const COMPATIBLE_AUDIO_CODECS = new Set(['aac', 'mp3', 'opus', 'vorbis', 'flac']);
+// Containers that browsers can play directly
+const BROWSER_CONTAINERS = new Set(['.mp4', '.webm']);
 
 interface MediaRow {
 	id: number;
@@ -15,17 +21,59 @@ interface MediaRow {
 	title: string;
 }
 
+interface ProbeResult {
+	video_codec: string | null;
+	audio_codec: string | null;
+	container: string;
+}
+
+type TranscodeAction = 'skip' | 'remux' | 'transcode';
 type HwAccel = 'vaapi' | 'none';
 
+function probeCodecs(filePath: string): ProbeResult {
+	try {
+		const result = execSync(
+			`ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+			{ stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
+		);
+		const videoCodec = result.trim().toLowerCase() || null;
+
+		const audioResult = execSync(
+			`ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+			{ stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
+		);
+		const audioCodec = audioResult.trim().toLowerCase() || null;
+
+		return {
+			video_codec: videoCodec,
+			audio_codec: audioCodec,
+			container: path.extname(filePath).toLowerCase()
+		};
+	} catch {
+		return { video_codec: null, audio_codec: null, container: path.extname(filePath).toLowerCase() };
+	}
+}
+
+function decideAction(probe: ProbeResult): TranscodeAction {
+	const videoOk = !probe.video_codec || COMPATIBLE_VIDEO_CODECS.has(probe.video_codec);
+	const audioOk = !probe.audio_codec || COMPATIBLE_AUDIO_CODECS.has(probe.audio_codec);
+
+	if (videoOk && audioOk && BROWSER_CONTAINERS.has(probe.container)) {
+		return 'skip';
+	}
+	if (videoOk && audioOk) {
+		// Compatible codecs but wrong container (e.g. MKV with H.265+AAC) → remux
+		return 'remux';
+	}
+	return 'transcode';
+}
+
 function detectHwAccel(): HwAccel {
-	// Check for VAAPI device (AMD/Intel)
 	if (fs.existsSync('/dev/dri/renderD128')) {
 		try {
 			execSync('ffmpeg -init_hw_device vaapi=va:/dev/dri/renderD128 -f lavfi -i nullsrc -t 0.1 -vf "format=nv12,hwupload" -c:v h264_vaapi -f null - 2>&1', { stdio: 'pipe' });
 			return 'vaapi';
-		} catch {
-			// VAAPI device exists but encoding failed
-		}
+		} catch {}
 	}
 	return 'none';
 }
@@ -64,7 +112,6 @@ function buildVideoArgs(input: string, output: string, hwAccel: HwAccel): string
 		];
 	}
 
-	// Software fallback: optimized for AMD Ryzen R1600 (2C/4T)
 	return [
 		'-i', input,
 		'-c:v', 'libx264',
@@ -106,13 +153,37 @@ function runFfmpeg(
 	ffmpeg.on('error', () => onClose(-1));
 }
 
+function finishMedia(
+	db: Database.Database,
+	mediaId: number,
+	outputPath: string,
+	originalPath: string,
+	mediaPath: string,
+	originalsPath: string,
+	thumbPath: string | null,
+	duration: number | null,
+	callback: () => void
+) {
+	const chapters = extractChapters(originalPath);
+	if (chapters.length > 0) saveChapters(db, mediaId, chapters);
+
+	// Move original to backup
+	const relativePath = path.relative(mediaPath, originalPath);
+	const backupPath = path.join(originalsPath, relativePath);
+	fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+	fs.renameSync(originalPath, backupPath);
+
+	const newHash = computeFileHash(outputPath);
+	db.prepare(
+		"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
+	).run(outputPath, thumbPath, duration ? Math.round(duration) : null, newHash, mediaId);
+
+	callback();
+}
+
 export function startTranscodeWorker(db: Database.Database, mediaPath: string, originalsPath: string) {
 	const hwAccel = detectHwAccel();
-	if (hwAccel === 'vaapi') {
-		console.log('[transcoder] VAAPI hardware encoding enabled');
-	} else {
-		console.log('[transcoder] Using software encoding (libx264)');
-	}
+	console.log(`[transcoder] ${hwAccel === 'vaapi' ? 'VAAPI hardware encoding enabled' : 'Using software encoding (libx264)'}`);
 
 	const processNext = () => {
 		const next = db.prepare(
@@ -125,116 +196,135 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 		}
 
 		db.prepare("UPDATE media SET transcode_status = 'processing', transcode_progress = 0 WHERE id = ?").run(next.id);
-		console.log(`[transcoder] Processing: "${next.title}"`);
 
 		const ext = path.extname(next.original_path).toLowerCase();
 		const isAudio = AUDIO_ONLY.has(ext);
 		const baseName = path.basename(next.original_path, ext);
 		const fileDir = path.dirname(next.original_path);
 
-		if (BROWSER_COMPATIBLE.has(ext) || BROWSER_COMPATIBLE_AUDIO.has(ext)) {
-			if (isAudio) {
+		// === Audio handling ===
+		if (isAudio) {
+			if (BROWSER_COMPATIBLE_AUDIO.has(ext)) {
 				db.prepare(
 					"UPDATE media SET transcode_status = 'skipped', transcode_progress = 100, updated_at = datetime('now') WHERE id = ?"
 				).run(next.id);
 				console.log(`[transcoder] Skipped (compatible audio): "${next.title}"`);
 				setTimeout(processNext, 1000);
 			} else {
-				const thumbPath = path.join(fileDir, `${baseName}-thumb.jpg`);
-				generateThumbnail(next.original_path, thumbPath, () => {
-					const duration = getDuration(next.original_path);
-					const chapters = extractChapters(next.original_path);
-					if (chapters.length > 0) saveChapters(db, next.id, chapters);
-					db.prepare(
-						"UPDATE media SET transcode_status = 'skipped', transcode_progress = 100, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
-					).run(thumbPath, duration ? Math.round(duration) : null, next.id);
-					console.log(`[transcoder] Skipped (compatible video): "${next.title}" [${chapters.length} chapters]`);
-					setTimeout(processNext, 1000);
+				const totalDuration = getDuration(next.original_path);
+				const outputPath = path.join(fileDir, `${baseName}.aac`);
+				const args = ['-i', next.original_path, '-c:a', 'aac', '-b:a', '192k', '-y', outputPath];
+				runFfmpeg(args, db, next.id, totalDuration, (code) => {
+					if (code === 0) {
+						finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, null, totalDuration, () => {
+							console.log(`[transcoder] Done (audio): "${next.title}"`);
+							setTimeout(processNext, 1000);
+						});
+					} else {
+						db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
+						console.error(`[transcoder] Failed (audio): "${next.title}"`);
+						setTimeout(processNext, 5000);
+					}
 				});
 			}
 			return;
 		}
 
+		// === Video handling ===
+		const probe = probeCodecs(next.original_path);
+		const action = decideAction(probe);
 		const totalDuration = getDuration(next.original_path);
-		const outputExt = isAudio ? '.aac' : '.mp4';
-		const outputPath = path.join(fileDir, `${baseName}${outputExt}`);
-		const thumbPath = isAudio ? null : path.join(fileDir, `${baseName}-thumb.jpg`);
+		const thumbPath = path.join(fileDir, `${baseName}-thumb.jpg`);
 
-		const args = isAudio
-			? ['-i', next.original_path, '-c:a', 'aac', '-b:a', '192k', '-y', outputPath]
-			: buildVideoArgs(next.original_path, outputPath, hwAccel);
+		console.log(`[transcoder] "${next.title}" — ${probe.video_codec}/${probe.audio_codec} in ${probe.container} → ${action}`);
 
-		const handleComplete = (code: number | null) => {
-			if (code === 0) {
-				// Extract chapters from original file before it gets moved
-				if (!isAudio) {
-					const chapters = extractChapters(next.original_path);
-					if (chapters.length > 0) saveChapters(db, next.id, chapters);
-				}
+		if (action === 'skip') {
+			// Already browser-compatible container + codecs
+			generateThumbnail(next.original_path, thumbPath, () => {
+				const chapters = extractChapters(next.original_path);
+				if (chapters.length > 0) saveChapters(db, next.id, chapters);
+				db.prepare(
+					"UPDATE media SET transcode_status = 'skipped', transcode_progress = 100, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
+				).run(thumbPath, totalDuration ? Math.round(totalDuration) : null, next.id);
+				console.log(`[transcoder] Skipped (compatible): "${next.title}" [${chapters.length} chapters]`);
+				setTimeout(processNext, 1000);
+			});
+			return;
+		}
 
-				const afterTranscode = () => {
-					const relativePath = path.relative(mediaPath, next.original_path);
-					const backupPath = path.join(originalsPath, relativePath);
-					fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-					fs.renameSync(next.original_path, backupPath);
-
-					const newHash = computeFileHash(outputPath);
-					db.prepare(
-						"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
-					).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, newHash, next.id);
-					console.log(`[transcoder] Done: "${next.title}"`);
-					setTimeout(processNext, 1000);
-				};
-
-				if (thumbPath) {
-					generateThumbnail(next.original_path, thumbPath, afterTranscode);
+		if (action === 'remux') {
+			// Compatible codecs, just need container change → fast copy
+			const outputPath = path.join(fileDir, `${baseName}.mp4`);
+			const args = ['-i', next.original_path, '-c', 'copy', '-movflags', '+faststart', '-y', outputPath];
+			runFfmpeg(args, db, next.id, totalDuration, (code) => {
+				if (code === 0) {
+					generateThumbnail(next.original_path, thumbPath, () => {
+						finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
+							console.log(`[transcoder] Remuxed: "${next.title}"`);
+							setTimeout(processNext, 1000);
+						});
+					});
 				} else {
-					afterTranscode();
+					// Remux failed, fall through to full transcode
+					console.warn(`[transcoder] Remux failed for "${next.title}", falling back to transcode`);
+					doFullTranscode(db, next, outputPath, thumbPath, totalDuration, mediaPath, originalsPath, hwAccel, () => setTimeout(processNext, 1000));
 				}
-			} else if (code !== 0 && hwAccel !== 'none' && !isAudio) {
-				// VAAPI failed, retry with software encoding
+			});
+			return;
+		}
+
+		// action === 'transcode'
+		const outputPath = path.join(fileDir, `${baseName}.mp4`);
+		doFullTranscode(db, next, outputPath, thumbPath, totalDuration, mediaPath, originalsPath, hwAccel, () => setTimeout(processNext, 1000));
+	};
+
+	function doFullTranscode(
+		db: Database.Database,
+		next: MediaRow,
+		outputPath: string,
+		thumbPath: string,
+		totalDuration: number | null,
+		mediaPath: string,
+		originalsPath: string,
+		hwAccel: HwAccel,
+		done: () => void
+	) {
+		const args = buildVideoArgs(next.original_path, outputPath, hwAccel);
+		db.prepare("UPDATE media SET transcode_progress = 0 WHERE id = ?").run(next.id);
+
+		runFfmpeg(args, db, next.id, totalDuration, (code) => {
+			if (code === 0) {
+				generateThumbnail(next.original_path, thumbPath, () => {
+					finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
+						console.log(`[transcoder] Transcoded: "${next.title}"`);
+						done();
+					});
+				});
+			} else if (hwAccel !== 'none') {
 				console.warn(`[transcoder] VAAPI failed for "${next.title}", retrying with software`);
-				db.prepare("UPDATE media SET transcode_progress = 0 WHERE id = ?").run(next.id);
 				const swArgs = buildVideoArgs(next.original_path, outputPath, 'none');
+				db.prepare("UPDATE media SET transcode_progress = 0 WHERE id = ?").run(next.id);
 				runFfmpeg(swArgs, db, next.id, totalDuration, (swCode) => {
 					if (swCode === 0) {
-						const afterTranscode = () => {
-							const relativePath = path.relative(mediaPath, next.original_path);
-							const backupPath = path.join(originalsPath, relativePath);
-							fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-							fs.renameSync(next.original_path, backupPath);
-
-							const newHash = computeFileHash(outputPath);
-							db.prepare(
-								"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
-							).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, newHash, next.id);
-							console.log(`[transcoder] Done (software fallback): "${next.title}"`);
-							setTimeout(processNext, 1000);
-						};
-						if (thumbPath) {
-							generateThumbnail(next.original_path, thumbPath, afterTranscode);
-						} else {
-							afterTranscode();
-						}
+						generateThumbnail(next.original_path, thumbPath, () => {
+							finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
+								console.log(`[transcoder] Transcoded (software fallback): "${next.title}"`);
+								done();
+							});
+						});
 					} else {
-						db.prepare(
-							"UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?"
-						).run(next.id);
+						db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 						console.error(`[transcoder] Failed: "${next.title}"`);
-						setTimeout(processNext, 5000);
+						setTimeout(done, 4000);
 					}
 				});
 			} else {
-				db.prepare(
-					"UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?"
-				).run(next.id);
+				db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 				console.error(`[transcoder] Failed: "${next.title}"`);
-				setTimeout(processNext, 5000);
+				setTimeout(done, 4000);
 			}
-		};
-
-		runFfmpeg(args, db, next.id, totalDuration, handleComplete);
-	};
+		});
+	}
 
 	setTimeout(processNext, 2000);
 }
