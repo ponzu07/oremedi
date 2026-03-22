@@ -14,7 +14,7 @@ function ensureWorker() {
 	workerStarted = true;
 	try {
 		const db = getDb();
-		startTranscodeWorker(db, config.mediaPath, config.convertedPath);
+		startTranscodeWorker(db, config.mediaPath, config.originalsPath);
 	} catch {
 		// Worker will retry on next request
 		workerStarted = false;

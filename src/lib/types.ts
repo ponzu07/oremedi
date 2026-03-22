@@ -8,7 +8,6 @@ export interface Media {
 	category: MediaCategory;
 	duration: number | null;
 	original_path: string;
-	converted_path: string | null;
 	thumbnail_path: string | null;
 	transcode_status: TranscodeStatus;
 	created_at: string;

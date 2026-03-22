@@ -22,6 +22,12 @@ export function createDatabase(dbPath: string): Database.Database {
 		`);
 	}
 
+	// Migrate: drop converted_path column from media if it exists
+	const mediaColumns = db.prepare("PRAGMA table_info('media')").all() as { name: string }[];
+	if (mediaColumns.some(c => c.name === 'converted_path')) {
+		db.exec("ALTER TABLE media DROP COLUMN converted_path");
+	}
+
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS media (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +35,6 @@ export function createDatabase(dbPath: string): Database.Database {
 			category TEXT NOT NULL CHECK(category IN ('movie', 'live_video', 'voice', 'music')),
 			duration INTEGER,
 			original_path TEXT NOT NULL UNIQUE,
-			converted_path TEXT,
 			thumbnail_path TEXT,
 			transcode_status TEXT NOT NULL DEFAULT 'pending'
 				CHECK(transcode_status IN ('pending', 'processing', 'ready', 'failed', 'skipped')),

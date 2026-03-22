@@ -5,5 +5,5 @@ export const config = {
 	jwtSecret: env.JWT_SECRET ?? '',
 	databasePath: env.DATABASE_PATH ?? 'data/oremedi.db',
 	mediaPath: env.MEDIA_PATH ?? '/media',
-	convertedPath: env.CONVERTED_PATH ?? '/media-converted'
+	originalsPath: env.ORIGINALS_PATH ?? '/media-originals'
 };

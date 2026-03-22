@@ -11,7 +11,7 @@ export const POST: RequestHandler = async ({ params }) => {
 	}
 
 	db.prepare(
-		"UPDATE media SET transcode_status = 'pending', converted_path = NULL, updated_at = datetime('now') WHERE id = ?"
+		"UPDATE media SET transcode_status = 'pending', updated_at = datetime('now') WHERE id = ?"
 	).run(params.id);
 
 	return json({ success: true });

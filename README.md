@@ -21,7 +21,7 @@
 
 ```bash
 mkdir -p /volume1/docker/oremedi/media
-mkdir -p /volume1/docker/oremedi/media-converted
+mkdir -p /volume1/docker/oremedi/media-originals
 ```
 
 JWT用のシークレットキーを生成:
@@ -40,14 +40,14 @@ services:
       - "3000:3000"
     volumes:
       - /volume1/docker/oremedi/media:/media
-      - /volume1/docker/oremedi/media-converted:/media-converted
+      - /volume1/docker/oremedi/media-originals:/media-originals
       - oremedi-data:/data
     environment:
       - PASSWORD=your_password_here
       - JWT_SECRET=your_generated_secret_here
       - DATABASE_PATH=/data/oremedi.db
       - MEDIA_PATH=/media
-      - CONVERTED_PATH=/media-converted
+      - ORIGINALS_PATH=/media-originals
       - BODY_SIZE_LIMIT=Infinity
     restart: unless-stopped
 
@@ -71,7 +71,7 @@ docker compose up -d
 | `JWT_SECRET` | JWT署名用シークレット（必ず変更） | — |
 | `DATABASE_PATH` | SQLiteのDBファイルパス | `data/oremedi.db` |
 | `MEDIA_PATH` | メディアファイルの格納先 | `/media` |
-| `CONVERTED_PATH` | トランスコード済みファイルの格納先 | `/media-converted` |
+| `ORIGINALS_PATH` | トランスコード前の元ファイルの退避先 | `/media-originals` |
 | `BODY_SIZE_LIMIT` | アップロードの最大サイズ | `512K`（`Infinity`推奨） |
 
 ## ローカル開発

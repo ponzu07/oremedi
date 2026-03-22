@@ -5,14 +5,14 @@ services:
       - "3000:3000"
     volumes:
       - /volume1/docker/oremedi/media:/media
-      - /volume1/docker/oremedi/media-converted:/media-converted
+      - /volume1/docker/oremedi/media-originals:/media-originals
       - oremedi-data:/data
     environment:
       - PASSWORD=oremedi
       - JWT_SECRET=change_me_to_a_random_string
       - DATABASE_PATH=/data/oremedi.db
       - MEDIA_PATH=/media
-      - CONVERTED_PATH=/media-converted
+      - ORIGINALS_PATH=/media-originals
       - BODY_SIZE_LIMIT=Infinity
     restart: unless-stopped
 

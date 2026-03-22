@@ -3,23 +3,15 @@ import { getDb } from '$lib/server/database';
 import fs from 'fs';
 import path from 'path';
 
-interface MediaRow {
-	original_path: string;
-	converted_path: string | null;
-}
-
 export const GET: RequestHandler = async ({ params, request }) => {
 	const db = getDb();
-	const media = db.prepare('SELECT original_path, converted_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
+	const media = db.prepare('SELECT original_path FROM media WHERE id = ?').get(params.id) as { original_path: string } | undefined;
 
 	if (!media) {
 		return new Response('Not found', { status: 404 });
 	}
 
-	// Use converted file if available, otherwise original
-	const filePath = media.converted_path && fs.existsSync(media.converted_path)
-		? media.converted_path
-		: media.original_path;
+	const filePath = media.original_path;
 
 	if (!fs.existsSync(filePath)) {
 		return new Response('File not found', { status: 404 });

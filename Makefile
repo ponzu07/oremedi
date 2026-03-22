@@ -17,7 +17,7 @@ build:
 	npm run build
 
 seed:
-	@mkdir -p /tmp/oremedi-media/{movies,live,voice,music} /tmp/oremedi-converted data
+	@mkdir -p /tmp/oremedi-media/{movies,live,voice,music} /tmp/oremedi-originals data
 	npx tsx scripts/seed.ts
 
 # Docker
@@ -25,12 +25,12 @@ docker-build:
 	docker build -t oremedi .
 
 docker-run:
-	@mkdir -p /tmp/oremedi-media /tmp/oremedi-converted data
+	@mkdir -p /tmp/oremedi-media /tmp/oremedi-originals data
 	docker run --rm -d --name oremedi \
 		-p 3000:3000 \
 		--env-file .env \
-		-v /tmp/oremedi-media:/media:ro \
-		-v /tmp/oremedi-converted:/media-converted \
+		-v /tmp/oremedi-media:/media \
+		-v /tmp/oremedi-originals:/media-originals \
 		-v $(PWD)/data:/data \
 		oremedi
 	@echo "http://localhost:3000 で起動"
