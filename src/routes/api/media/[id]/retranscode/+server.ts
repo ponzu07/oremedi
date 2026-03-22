@@ -4,9 +4,7 @@ import { getDb } from '$lib/server/database';
 
 export const POST: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const media = db.prepare('SELECT id, transcode_status FROM media WHERE id = ?').get(params.id) as
-		| { id: number; transcode_status: string }
-		| undefined;
+	const media = db.prepare('SELECT id FROM media WHERE id = ?').get(params.id);
 
 	if (!media) {
 		return json({ error: 'Not found' }, { status: 404 });

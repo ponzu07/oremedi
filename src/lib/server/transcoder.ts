@@ -35,14 +35,13 @@ export function startTranscodeWorker(db: Database.Database, convertedPath: strin
 
 		// Check if already browser-compatible MP4 with H.264
 		if (BROWSER_COMPATIBLE.has(ext)) {
-			const outputPath = next.original_path;
 			const thumbPath = path.join(outputDir, `${baseName}-thumb.jpg`);
 
 			// Generate thumbnail only (BROWSER_COMPATIBLE only contains .mp4, always video)
 			generateThumbnail(next.original_path, thumbPath, () => {
 				db.prepare(
-					"UPDATE media SET transcode_status = 'skipped', converted_path = ?, thumbnail_path = ?, updated_at = datetime('now') WHERE id = ?"
-				).run(outputPath, thumbPath, next.id);
+					"UPDATE media SET transcode_status = 'skipped', thumbnail_path = ?, updated_at = datetime('now') WHERE id = ?"
+				).run(thumbPath, next.id);
 				setTimeout(processNext, 1000);
 			});
 			return;

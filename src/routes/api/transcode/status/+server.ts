@@ -5,26 +5,17 @@ import { getDb } from '$lib/server/database';
 export const GET: RequestHandler = async () => {
 	const db = getDb();
 
-	const pending = db.prepare(
-		"SELECT COUNT(*) as count FROM media WHERE transcode_status = 'pending'"
-	).get() as { count: number };
-
-	const processing = db.prepare(
-		"SELECT COUNT(*) as count FROM media WHERE transcode_status = 'processing'"
-	).get() as { count: number };
-
-	const failed = db.prepare(
-		"SELECT COUNT(*) as count FROM media WHERE transcode_status = 'failed'"
-	).get() as { count: number };
+	const counts = db.prepare(
+		`SELECT
+			SUM(transcode_status = 'pending') as pending,
+			SUM(transcode_status = 'processing') as processing,
+			SUM(transcode_status = 'failed') as failed
+		FROM media`
+	).get() as { pending: number; processing: number; failed: number };
 
 	const queue = db.prepare(
 		"SELECT id, title, transcode_status FROM media WHERE transcode_status IN ('pending', 'processing') ORDER BY created_at"
 	).all();
 
-	return json({
-		pending: pending.count,
-		processing: processing.count,
-		failed: failed.count,
-		queue
-	});
+	return json({ ...counts, queue });
 };
