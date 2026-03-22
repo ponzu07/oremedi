@@ -4,8 +4,8 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - /volume1/media:/media
-      - /volume1/media-converted:/media-converted
+      - /volume1/docker/oremedi/media:/media
+      - /volume1/docker/oremedi/media-converted:/media-converted
       - oremedi-data:/data
     environment:
       - PASSWORD=oremedi

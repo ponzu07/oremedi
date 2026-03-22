@@ -1,42 +1,84 @@
-# sv
+# OreMedi
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+自宅NAS向けのセルフホスト型メディアサーバー。動画・音楽・ボイスコンテンツをブラウザから管理・再生できるPWAアプリ。
 
-## Creating a project
+## 機能
 
-If you're seeing this, you've probably already done this step. Congrats!
+- 動画/音楽/ボイスの再生・キュー管理
+- FFmpegによる自動トランスコード
+- タグシステム（自由なカテゴリ）
+- ドラッグ&ドロップでファイルアップロード
+- フォルダスキャンによる一括登録
+- グローバル検索（タイトル・タグ横断）
+- PWA対応（オフラインダウンロード）
+- Chromecastサポート
 
-```sh
-# create a new project
-npx sv create my-app
+## セットアップ（Docker）
+
+### 1. 事前準備
+
+メディア用のディレクトリを作成:
+
+```bash
+mkdir -p /volume1/docker/oremedi/media
+mkdir -p /volume1/docker/oremedi/media-converted
 ```
 
-To recreate this project with the same configuration:
+JWT用のシークレットキーを生成:
 
-```sh
-# recreate this project
-npx sv@0.12.8 create --template minimal --types ts --no-install .
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-## Developing
+### 2. docker-compose.yml
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+```yaml
+services:
+  oremedi:
+    image: ghcr.io/ponzu07/oremedi:main
+    ports:
+      - "3000:3000"
+    volumes:
+      - /volume1/docker/oremedi/media:/media
+      - /volume1/docker/oremedi/media-converted:/media-converted
+      - oremedi-data:/data
+    environment:
+      - PASSWORD=your_password_here
+      - JWT_SECRET=your_generated_secret_here
+      - DATABASE_PATH=/data/oremedi.db
+      - MEDIA_PATH=/media
+      - CONVERTED_PATH=/media-converted
+      - BODY_SIZE_LIMIT=Infinity
+    restart: unless-stopped
 
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+volumes:
+  oremedi-data:
 ```
 
-## Building
+### 3. 起動
 
-To create a production version of your app:
-
-```sh
-npm run build
+```bash
+docker compose up -d
 ```
 
-You can preview the production build with `npm run preview`.
+ブラウザで `http://<NASのIP>:3000` にアクセス。
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+### 環境変数
+
+| 変数 | 説明 | デフォルト |
+|------|------|-----------|
+| `PASSWORD` | ログインパスワード | `oremedi` |
+| `JWT_SECRET` | JWT署名用シークレット（必ず変更） | — |
+| `DATABASE_PATH` | SQLiteのDBファイルパス | `data/oremedi.db` |
+| `MEDIA_PATH` | メディアファイルの格納先 | `/media` |
+| `CONVERTED_PATH` | トランスコード済みファイルの格納先 | `/media-converted` |
+| `BODY_SIZE_LIMIT` | アップロードの最大サイズ | `512K`（`Infinity`推奨） |
+
+## ローカル開発
+
+```bash
+npm install
+npm run dev -- --port 3000
+```
+
+デフォルトパスワード: `oremedi`
