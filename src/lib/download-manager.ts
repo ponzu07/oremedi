@@ -125,7 +125,7 @@ export async function listDownloads(): Promise<DownloadEntry[]> {
 				id: item.id,
 				title: item.title,
 				category: item.category,
-				status: item.blob.size > 0 ? 'downloaded' : 'needs-redownload',
+				status: item.size > 0 ? 'downloaded' : 'needs-redownload',
 				size: item.size,
 				downloadedAt: item.downloadedAt
 			}));
