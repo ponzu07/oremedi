@@ -3,13 +3,12 @@ import { getDb } from '$lib/server/database';
 import fs from 'fs';
 
 interface MediaRow {
-	id: number;
 	thumbnail_path: string | null;
 }
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const media = db.prepare('SELECT id, thumbnail_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
+	const media = db.prepare('SELECT thumbnail_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
 
 	if (!media || !media.thumbnail_path || !fs.existsSync(media.thumbnail_path)) {
 		return new Response('No thumbnail', { status: 404 });

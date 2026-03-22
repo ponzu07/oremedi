@@ -11,7 +11,7 @@ interface DownloadedMedia {
 	size: number;
 }
 
-export type DownloadStatus = 'available' | 'downloading' | 'downloaded' | 'needs-redownload';
+export type DownloadStatus = 'downloaded' | 'needs-redownload';
 
 interface DownloadEntry {
 	id: number;

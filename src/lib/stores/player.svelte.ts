@@ -304,7 +304,7 @@ function createPlayerStore() {
 	function skipForward(seconds: number = 30) {
 		const el = getActiveElement();
 		if (el) {
-			el.currentTime = Math.min(el.currentTime + seconds, el.duration || Infinity);
+			el.currentTime = Math.min(el.currentTime + seconds, el.duration);
 		}
 	}
 

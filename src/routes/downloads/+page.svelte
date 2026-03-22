@@ -31,8 +31,6 @@
 	}
 
 	const statusLabels: Record<DownloadStatus, string> = {
-		available: 'Not downloaded',
-		downloading: 'Downloading...',
 		downloaded: 'Downloaded',
 		'needs-redownload': 'Needs re-download'
 	};
