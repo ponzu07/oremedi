@@ -13,7 +13,7 @@
 			placeholder="Password"
 			autocomplete="current-password"
 			required
-			class="input input-bordered w-full"
+			class="input w-full"
 		/>
 		{#if form?.error}
 			<div class="alert alert-error text-sm py-2">

@@ -147,7 +147,7 @@
 
 	<div class="flex gap-2 mb-3">
 		<input
-			class="input input-bordered flex-1"
+			class="input flex-1"
 			type="search"
 			placeholder="検索..."
 			bind:value={searchQuery}
@@ -163,14 +163,14 @@
 
 	{#if showAddForm}
 		<form class="bg-base-200 rounded-box p-4 mb-4 flex flex-col gap-2" onsubmit={(e) => { e.preventDefault(); addMedia(); }}>
-			<input class="input input-bordered w-full" bind:value={newTitle} placeholder="タイトル" required />
-			<select class="select select-bordered w-full" bind:value={newCategory}>
+			<input class="input w-full" bind:value={newTitle} placeholder="タイトル" required />
+			<select class="select w-full" bind:value={newCategory}>
 				<option value="movie">Movie</option>
 				<option value="live_video">Live Video</option>
 				<option value="voice">Voice</option>
 				<option value="music">Music</option>
 			</select>
-			<input class="input input-bordered w-full" bind:value={newPath} placeholder="NASファイルパス" required />
+			<input class="input w-full" bind:value={newPath} placeholder="NASファイルパス" required />
 			<button class="btn btn-primary" type="submit">追加</button>
 		</form>
 	{/if}
@@ -195,11 +195,11 @@
 					<div class="bg-base-200 rounded-box p-4 my-2 flex flex-col gap-2">
 						<label class="flex flex-col gap-1">
 							<span class="text-xs text-base-content/50">タイトル</span>
-							<input class="input input-bordered w-full" bind:value={editTitle} />
+							<input class="input w-full" bind:value={editTitle} />
 						</label>
 						<label class="flex flex-col gap-1">
 							<span class="text-xs text-base-content/50">カテゴリ</span>
-							<select class="select select-bordered w-full" bind:value={editCategory}>
+							<select class="select w-full" bind:value={editCategory}>
 								<option value="movie">Movie</option>
 								<option value="live_video">Live Video</option>
 								<option value="voice">Voice</option>

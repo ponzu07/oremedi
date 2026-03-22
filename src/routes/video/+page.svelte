@@ -68,7 +68,7 @@
 	<PageHeader title="Video" />
 
 	<!-- Sub-category tabs -->
-	<div role="tablist" class="tabs tabs-boxed mb-4">
+	<div role="tablist" class="tabs tabs-border mb-4">
 		<a role="tab" class="tab" class:tab-active={!data.currentSub} href="/video">All</a>
 		<a role="tab" class="tab" class:tab-active={data.currentSub === 'movie'} href="/video?sub=movie">Movies</a>
 		<a role="tab" class="tab" class:tab-active={data.currentSub === 'live'} href="/video?sub=live">Live</a>

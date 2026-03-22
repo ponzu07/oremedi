@@ -30,11 +30,11 @@
 	}
 </script>
 
-<div class="btm-nav btm-nav-sm z-[100]" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+<div class="dock dock-sm z-[100]">
 	{#each navItems as item}
-		<a href={item.href} class:active={isActive(item.href)}>
+		<a href={item.href} class:dock-active={isActive(item.href)}>
 			<item.icon size={20} />
-			<span class="btm-nav-label text-xs">{item.label}</span>
+			<span class="dock-label">{item.label}</span>
 		</a>
 	{/each}
 </div>
