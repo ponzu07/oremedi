@@ -244,7 +244,7 @@
 							</div>
 							<datalist id="tag-suggestions">
 								{#each data.allTags.filter(t => t.category === newTagCategory) as t}
-									<option value={t.name} />
+									<option value={t.name}></option>
 								{/each}
 							</datalist>
 						</div>
