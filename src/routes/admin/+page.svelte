@@ -22,7 +22,7 @@
 	let filterCategory = $state<string>('all');
 	let searchQuery = $state('');
 
-	let filteredMedia = $derived(() => {
+	let filteredMedia = $derived.by(() => {
 		let items = data.media;
 		if (filterCategory !== 'all') {
 			items = items.filter((m) => m.category === filterCategory);
@@ -186,10 +186,10 @@
 		{/each}
 	</div>
 
-	<p class="text-xs text-base-content/50 mb-2">{filteredMedia().length}件</p>
+	<p class="text-xs text-base-content/50 mb-2">{filteredMedia.length}件</p>
 
 	<ul class="list-none p-0">
-		{#each filteredMedia() as item (item.id)}
+		{#each filteredMedia as item (item.id)}
 			<li class="border-b border-base-300">
 				{#if editingId === item.id}
 					<div class="bg-base-200 rounded-box p-4 my-2 flex flex-col gap-2">

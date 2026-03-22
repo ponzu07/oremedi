@@ -57,20 +57,10 @@
 <Toast />
 
 <style>
-	@keyframes fadeIn {
-		from { opacity: 0; }
-		to { opacity: 1; }
-	}
-
 	:global(body) {
 		margin: 0;
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		padding-bottom: var(--bottom-offset);
-	}
-
-	:global(.home),
-	:global(.list-page) {
-		animation: fadeIn 0.2s ease-out;
 	}
 
 	/* Global video wrapper states */

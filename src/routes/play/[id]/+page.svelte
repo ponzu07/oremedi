@@ -30,7 +30,6 @@
 	let videoSeekValue = $state(0);
 	let controlsVisible = $state(true);
 	let hideTimer: ReturnType<typeof setTimeout> | null = null;
-	let showMetadata = $state(false);
 	let resumeTime = $state<number | null>(null);
 	let resumeSaveInterval: ReturnType<typeof setInterval> | null = null;
 	let isPip = $state(false);
@@ -279,8 +278,8 @@
 		})()
 	);
 
-	let pipSupported = $derived(document.pictureInPictureEnabled);
-	let fullscreenSupported = $derived(document.fullscreenEnabled);
+	const pipSupported = document.pictureInPictureEnabled;
+	const fullscreenSupported = document.fullscreenEnabled;
 </script>
 
 {#if isVideo}
@@ -507,7 +506,7 @@
 		{/if}
 
 		{#if media.metadata && (media.metadata as any[]).length > 0}
-			<details class="vp-details" bind:open={showMetadata}>
+			<details class="vp-details">
 				<summary>詳細情報</summary>
 				<dl class="vp-meta-grid">
 					{#each media.metadata as meta}

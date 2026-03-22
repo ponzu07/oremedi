@@ -12,8 +12,6 @@
 	type GroupBy = 'none' | 'speaker' | 'tag';
 	let groupBy = $state<GroupBy>('none');
 
-	type TagEntry = { name: string; category: string };
-
 	function getGroups(items: any[], by: GroupBy): Map<string, any[]> {
 		if (by === 'none') {
 			return new Map([['All', items]]);
@@ -67,9 +65,9 @@
 						media={item}
 						onPlay={() => playVoice(data.items.indexOf(item))}
 						onQueue={() => addToQueue(item)}
-						metaText="{formatDuration(item.duration)}{item.tags?.length > 0 ? ` — ${(item.tags as TagEntry[]).map((t) => t.name).join(', ')}` : ''}"
+						metaText="{formatDuration(item.duration)}{item.tags?.length > 0 ? ` — ${(item.tags as { name: string; category: string }[]).map((t) => t.name).join(', ')}` : ''}"
 						thumbnailShape="circle"
-						placeholderText={(((item.tags as TagEntry[])?.find((t) => t.category === 'speaker')?.name ?? '?')[0]).toUpperCase()}
+						placeholderText={(((item.tags as { name: string; category: string }[])?.find((t) => t.category === 'speaker')?.name ?? '?')[0]).toUpperCase()}
 					/>
 				{/each}
 			</ul>
