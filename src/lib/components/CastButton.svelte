@@ -97,16 +97,15 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 0.5rem;
-		background: transparent;
+		padding: 4px;
+		background: none;
 		border: none;
-		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+		color: inherit;
 		cursor: pointer;
-		border-radius: 4px;
+		opacity: 0.7;
 	}
 
-	.cast-btn:hover {
-		color: var(--color-base-content);
-		background: var(--color-base-300);
+	.cast-btn:active {
+		opacity: 0.5;
 	}
 </style>
