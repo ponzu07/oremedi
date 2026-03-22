@@ -14,9 +14,7 @@
 		page.url.pathname.startsWith('/play/') ? (page.data as any)?.media?.category : undefined
 	);
 	const hasPlayer = $derived(playerStore.state.mediaId !== null);
-	const isCurrentVideo = $derived(
-		hasPlayer && isVideoCategory(playerStore.state.category)
-	);
+	const isCurrentVideo = $derived(isVideoCategory(playerStore.state.category));
 	const isFullPlayer = $derived(playerStore.state.isFullPlayer);
 
 	let audioEl: HTMLAudioElement;
