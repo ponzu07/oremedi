@@ -239,7 +239,7 @@
 		if (document.referrer && new URL(document.referrer).origin === location.origin) {
 			history.back();
 		} else {
-			goto(isVideo ? '/video' : '/audio');
+			goto(isVideo ? '/video' : (media.category as string) === 'voice' ? '/voice' : '/music');
 		}
 	}
 
@@ -981,7 +981,7 @@
 	}
 
 	.vp-btn.vp-active {
-		color: var(--color-accent);
+		color: oklch(var(--p));
 	}
 
 	.vp-rate-btn {
@@ -1047,7 +1047,7 @@
 		right: -2px;
 		font-size: 0.5rem;
 		font-weight: 700;
-		color: var(--color-accent);
+		color: oklch(var(--p));
 		line-height: 1;
 	}
 
@@ -1070,10 +1070,10 @@
 	}
 
 	.vp-resume-btn {
-		background: var(--color-accent);
+		background: oklch(var(--p));
 		color: white;
 		border: none;
-		border-radius: var(--radius-pill);
+		border-radius: 9999px;
 		padding: 0.5rem 1.25rem;
 		font-size: 0.85rem;
 		font-weight: 600;
@@ -1113,8 +1113,8 @@
 	}
 
 	.vp-info-subtitle {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
+		color: oklch(var(--bc) / 0.5);
+		font-size: 0.875rem;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -1123,10 +1123,10 @@
 	.vp-offline-badge {
 		display: inline-block;
 		padding: 0.2rem 0.6rem;
-		background: var(--color-surface);
-		color: var(--color-text-muted);
-		border-radius: var(--radius-sm);
-		font-size: var(--font-size-sm);
+		background: oklch(var(--b2));
+		color: oklch(var(--bc) / 0.5);
+		border-radius: 0.5rem;
+		font-size: 0.875rem;
 		margin-top: 0.5rem;
 	}
 
@@ -1135,8 +1135,8 @@
 	}
 
 	.vp-details summary {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
+		color: oklch(var(--bc) / 0.5);
+		font-size: 0.875rem;
 		cursor: pointer;
 		user-select: none;
 	}
@@ -1146,11 +1146,11 @@
 		display: grid;
 		grid-template-columns: auto 1fr;
 		gap: 0.25rem 1rem;
-		font-size: var(--font-size-sm);
+		font-size: 0.875rem;
 	}
 
 	.vp-meta-grid dt {
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 	}
 
 	.vp-meta-grid dd {
@@ -1169,29 +1169,29 @@
 		align-items: center;
 		gap: 0.35rem;
 		padding: 0.5rem 1rem;
-		background: var(--color-surface);
-		color: var(--color-text);
+		background: oklch(var(--b2));
+		color: oklch(var(--bc));
 		border: none;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 		cursor: pointer;
-		font-size: var(--font-size-sm);
+		font-size: 0.875rem;
 	}
 
 	.vp-action-btn:active {
-		background: var(--color-surface-alt);
+		background: oklch(var(--b3));
 	}
 
 	/* Video queue */
 	.vp-queue {
 		padding: 0.75rem 1rem 2rem;
-		border-top: 1px solid var(--color-surface-alt);
+		border-top: 1px solid oklch(var(--b3));
 	}
 
 	.vp-queue-title {
 		font-size: 1rem;
 		font-weight: 700;
 		margin: 0 0 0.5rem;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 	}
 
 	.vp-queue-list {
@@ -1205,24 +1205,24 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.5rem;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 		background: none;
 		border: none;
 		border-left: 3px solid transparent;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 		text-align: left;
 		cursor: pointer;
 		width: 100%;
-		font-size: var(--font-size-base);
+		font-size: 1rem;
 	}
 
 	.vp-queue-item:active {
-		background: var(--color-surface);
+		background: oklch(var(--b2));
 	}
 
 	.vp-queue-current {
-		border-left-color: var(--color-accent);
-		background: var(--color-surface);
+		border-left-color: oklch(var(--p));
+		background: oklch(var(--b2));
 	}
 
 	.vp-queue-thumb {
@@ -1230,7 +1230,7 @@
 		height: 32px;
 		border-radius: 4px;
 		overflow: hidden;
-		background: var(--color-surface-alt);
+		background: oklch(var(--b3));
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -1244,7 +1244,7 @@
 	}
 
 	.vp-queue-thumb-placeholder {
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		opacity: 0.5;
 	}
 
@@ -1258,14 +1258,14 @@
 	.vp-queue-remove {
 		background: none;
 		border: none;
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		cursor: pointer;
 		padding: 4px;
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 	}
 
 	.vp-queue-remove:active {
@@ -1273,8 +1273,8 @@
 	}
 
 	.downloaded-badge {
-		color: var(--color-accent);
-		font-size: var(--font-size-base);
+		color: oklch(var(--p));
+		font-size: 1rem;
 	}
 
 	.download-progress {
@@ -1288,14 +1288,14 @@
 	.progress-bar {
 		flex: 1;
 		height: 6px;
-		background: var(--color-surface);
-		border-radius: var(--radius-sm);
+		background: oklch(var(--b2));
+		border-radius: 0.5rem;
 		overflow: hidden;
 	}
 
 	.progress-fill {
 		height: 100%;
-		background: var(--color-accent);
+		background: oklch(var(--p));
 		transition: width 0.2s;
 	}
 
@@ -1307,7 +1307,7 @@
 		max-width: 428px;
 		margin: 0 auto;
 		padding: 0 1rem;
-		background: var(--color-bg);
+		background: oklch(var(--b1));
 	}
 
 	/* Header */
@@ -1322,10 +1322,10 @@
 	.amp-header-btn {
 		background: none;
 		border: none;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 		cursor: pointer;
 		padding: 4px;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1336,12 +1336,12 @@
 	}
 
 	.amp-header-btn.amp-active {
-		color: var(--color-accent);
+		color: oklch(var(--p));
 	}
 
 	.amp-header-title {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
+		font-size: 0.875rem;
+		color: oklch(var(--bc) / 0.5);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		font-weight: 600;
@@ -1369,7 +1369,7 @@
 		aspect-ratio: 1;
 		border-radius: 16px;
 		overflow: hidden;
-		background: var(--color-surface-alt);
+		background: oklch(var(--b3));
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1394,7 +1394,7 @@
 	}
 
 	.amp-placeholder {
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		opacity: 0.5;
 	}
 
@@ -1407,15 +1407,15 @@
 	.amp-title {
 		font-size: 1.25rem;
 		font-weight: 700;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 
 	.amp-subtitle {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
+		font-size: 0.875rem;
+		color: oklch(var(--bc) / 0.5);
 		margin-top: 0.2rem;
 		white-space: nowrap;
 		overflow: hidden;
@@ -1432,7 +1432,7 @@
 		appearance: none;
 		width: 100%;
 		height: 4px;
-		background: var(--color-surface-alt);
+		background: oklch(var(--b3));
 		border-radius: 2px;
 		outline: none;
 		cursor: pointer;
@@ -1443,7 +1443,7 @@
 		appearance: none;
 		width: 14px;
 		height: 14px;
-		background: var(--color-text);
+		background: oklch(var(--bc));
 		border-radius: 50%;
 		cursor: pointer;
 		border: none;
@@ -1452,7 +1452,7 @@
 	.amp-seek-bar::-moz-range-thumb {
 		width: 14px;
 		height: 14px;
-		background: var(--color-text);
+		background: oklch(var(--bc));
 		border-radius: 50%;
 		cursor: pointer;
 		border: none;
@@ -1468,7 +1468,7 @@
 		justify-content: space-between;
 		margin-top: 0.35rem;
 		font-size: 0.7rem;
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -1483,7 +1483,7 @@
 	.amp-ctrl-btn {
 		background: none;
 		border: none;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 		cursor: pointer;
 		display: flex;
 		align-items: center;
@@ -1525,13 +1525,13 @@
 	.amp-ctrl-play {
 		width: 64px;
 		height: 64px;
-		background: var(--color-accent);
+		background: oklch(var(--p));
 		border-radius: 50%;
 		flex-shrink: 0;
 	}
 
 	.amp-ctrl-btn.amp-active {
-		color: var(--color-accent);
+		color: oklch(var(--p));
 	}
 
 	.amp-repeat-btn {
@@ -1544,7 +1544,7 @@
 		right: 2px;
 		font-size: 0.5rem;
 		font-weight: 700;
-		color: var(--color-accent);
+		color: oklch(var(--p));
 		line-height: 1;
 	}
 
@@ -1559,12 +1559,12 @@
 	.amp-sub-btn {
 		background: none;
 		border: none;
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		cursor: pointer;
-		font-size: var(--font-size-sm);
+		font-size: 0.875rem;
 		font-weight: 600;
 		padding: 0.25rem 0.5rem;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
@@ -1575,8 +1575,8 @@
 	}
 
 	.amp-dl-pct {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
+		font-size: 0.875rem;
+		color: oklch(var(--bc) / 0.5);
 	}
 
 	/* Queue view */
@@ -1590,11 +1590,11 @@
 		font-size: 1.1rem;
 		font-weight: 700;
 		margin: 0 0 0.75rem;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 	}
 
 	.amp-queue-empty {
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		text-align: center;
 		padding: 2rem 0;
 	}
@@ -1610,24 +1610,24 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.5rem;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 		background: none;
 		border: none;
 		border-left: 3px solid transparent;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 		text-align: left;
 		cursor: pointer;
 		width: 100%;
-		font-size: var(--font-size-base);
+		font-size: 1rem;
 	}
 
 	.amp-queue-item:active {
-		background: var(--color-surface);
+		background: oklch(var(--b2));
 	}
 
 	.amp-queue-current {
-		border-left-color: var(--color-accent);
-		background: var(--color-surface);
+		border-left-color: oklch(var(--p));
+		background: oklch(var(--b2));
 	}
 
 	.amp-queue-thumb {
@@ -1635,7 +1635,7 @@
 		height: 40px;
 		border-radius: 4px;
 		overflow: hidden;
-		background: var(--color-surface-alt);
+		background: oklch(var(--b3));
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -1649,7 +1649,7 @@
 	}
 
 	.amp-queue-thumb-placeholder {
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		opacity: 0.5;
 	}
 
@@ -1663,14 +1663,14 @@
 	.amp-queue-remove {
 		background: none;
 		border: none;
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		cursor: pointer;
 		padding: 4px;
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 	}
 
 	.amp-queue-remove:active {
