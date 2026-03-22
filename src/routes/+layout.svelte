@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '../app.css';
 	import { page } from '$app/state';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import MiniPlayer from '$lib/components/MiniPlayer.svelte';
@@ -66,8 +67,6 @@
 	:global(body) {
 		margin: 0;
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		background: var(--color-bg);
-		color: var(--color-text);
 		padding-bottom: var(--bottom-offset);
 	}
 
