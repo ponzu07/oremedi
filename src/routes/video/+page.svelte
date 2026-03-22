@@ -3,6 +3,11 @@
 	import { goto } from '$app/navigation';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import { addToQueue } from '$lib/utils';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import FilterPills from '$lib/components/FilterPills.svelte';
+	import GroupToggle from '$lib/components/GroupToggle.svelte';
+	import MediaCard from '$lib/components/MediaCard.svelte';
+	import { Plus } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -44,15 +49,6 @@
 
 	let liveGroups = $derived(getGroups(data.liveItems, groupBy));
 
-	function buildUrl(params: Record<string, string | null>): string {
-		const sp = new URLSearchParams();
-		for (const [k, v] of Object.entries(params)) {
-			if (v) sp.set(k, v);
-		}
-		const qs = sp.toString();
-		return qs ? `/video?${qs}` : '/video';
-	}
-
 	let showLive = $derived(!data.currentSub || data.currentSub === 'live');
 	let showMovies = $derived(!data.currentSub || data.currentSub === 'movie');
 	let totalCount = $derived(data.movies.length + data.liveItems.length);
@@ -66,88 +62,54 @@
 		playerStore.play(item.id, item.title, item.category, item.thumbnail_path ?? null);
 		goto(`/play/${item.id}`);
 	}
-
 </script>
 
-<div class="list-page">
-	<header>
-		<h1>Video</h1>
-	</header>
+<div class="max-w-[960px] mx-auto p-4">
+	<PageHeader title="Video" />
 
-	<!-- Sub-category chips -->
-	<div class="sub-chips">
-		<a href="/video" class:active={!data.currentSub}>All</a>
-		<a href="/video?sub=movie" class:active={data.currentSub === 'movie'}>Movies</a>
-		<a href="/video?sub=live" class:active={data.currentSub === 'live'}>Live</a>
+	<!-- Sub-category tabs -->
+	<div role="tablist" class="tabs tabs-boxed mb-4">
+		<a role="tab" class="tab" class:tab-active={!data.currentSub} href="/video">All</a>
+		<a role="tab" class="tab" class:tab-active={data.currentSub === 'movie'} href="/video?sub=movie">Movies</a>
+		<a role="tab" class="tab" class:tab-active={data.currentSub === 'live'} href="/video?sub=live">Live</a>
 	</div>
 
-	<!-- Genre filters (movie sub or all with movies) -->
+	<!-- Genre filters (movie sub only) -->
 	{#if showMovies && data.genres.length > 0 && data.currentSub === 'movie'}
-		<div class="filters">
-			<a href={buildUrl({ sub: 'movie' })} class:active={!data.currentGenre}>All</a>
-			{#each data.genres as genre}
-				<a
-					href={buildUrl({ sub: 'movie', genre })}
-					class:active={data.currentGenre === genre}
-				>
-					{genre}
-				</a>
-			{/each}
-		</div>
+		<FilterPills tags={data.genres.map(g => ({name: g}))} currentTag={data.currentGenre} baseHref="/video?sub=movie" />
 	{/if}
 
 	<!-- Tag filters (live sub only) -->
 	{#if showLive && data.tags.length > 0 && data.currentSub === 'live'}
-		<div class="filters">
-			<a href={buildUrl({ sub: 'live' })} class:active={!data.currentTag}>All</a>
-			{#each data.tags as tag}
-				<a
-					href={buildUrl({ sub: 'live', tag: tag.name })}
-					class:active={data.currentTag === tag.name}
-				>
-					{tag.name}
-				</a>
-			{/each}
-		</div>
+		<FilterPills tags={data.tags} currentTag={data.currentTag} baseHref="/video?sub=live" />
 	{/if}
 
 	<!-- Group-by toggle (live sub only) -->
 	{#if data.currentSub === 'live'}
-		<div class="group-toggle">
-			<span>Group by:</span>
-			<button class:active={groupBy === 'none'} onclick={() => (groupBy = 'none')}>None</button>
-			<button class:active={groupBy === 'artist'} onclick={() => (groupBy = 'artist')}>Artist</button>
-			<button class:active={groupBy === 'event'} onclick={() => (groupBy = 'event')}>Event</button>
-			<button class:active={groupBy === 'date'} onclick={() => (groupBy = 'date')}>Date</button>
-		</div>
+		<GroupToggle options={[
+			{value: 'none', label: 'None'},
+			{value: 'artist', label: 'Artist'},
+			{value: 'event', label: 'Event'},
+			{value: 'date', label: 'Date'}
+		]} current={groupBy} onChange={(v) => groupBy = v as GroupBy} />
 	{/if}
 
 	{#if totalCount === 0}
-		<p class="empty">No videos found</p>
+		<p class="text-center text-base-content/50 py-12">No videos found</p>
 	{:else}
 		<!-- Movies section -->
 		{#if showMovies && data.movies.length > 0}
 			{#if !data.currentSub}
-				<h3 class="section-title">Movies</h3>
+				<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">Movies</h3>
 			{/if}
-			<div class="media-grid">
-				{#each data.movies as movie, i}
-					<div class="media-card-wrap" class:playing={playerStore.state.mediaId === movie.id}>
-						<button class="media-card" onclick={() => playMovie(movie)}>
-							<div class="thumb-wrap">
-								{#if movie.thumbnail_path}
-									<img src={`/api/media/${movie.id}/thumbnail`} alt={movie.title} />
-								{:else}
-									<div class="thumb-placeholder">&#9658;</div>
-								{/if}
-							</div>
-							<div class="media-info">
-								<span class="media-title">{movie.title}</span>
-								<span class="media-meta">{movie.genre_value ?? '-'}</span>
-							</div>
-						</button>
-						<button class="queue-add-btn" onclick={() => addToQueue(movie)} aria-label="Add to queue">+</button>
-					</div>
+			<div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
+				{#each data.movies as movie}
+					<MediaCard
+						media={movie}
+						onPlay={() => playMovie(movie)}
+						onQueue={() => addToQueue(movie)}
+						metaText={movie.genre_value ?? ''}
+					/>
 				{/each}
 			</div>
 		{/if}
@@ -155,61 +117,49 @@
 		<!-- Live section -->
 		{#if showLive && data.liveItems.length > 0}
 			{#if !data.currentSub}
-				<h3 class="section-title">Live</h3>
+				<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">Live</h3>
 				<!-- All mode: show live in grid view -->
-				<div class="media-grid">
+				<div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
 					{#each data.liveItems as item}
-						<div class="media-card-wrap" class:playing={playerStore.state.mediaId === item.id}>
-							<button class="media-card" onclick={() => playLive(item)}>
-								<div class="thumb-wrap">
-									{#if item.thumbnail_path}
-										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} />
-									{:else}
-										<div class="thumb-placeholder">&#9658;</div>
-									{/if}
-								</div>
-								<div class="media-info">
-									<span class="media-title">{item.title}</span>
-									{#if item.meta?.event_name}
-										<span class="media-meta">{item.meta.event_name}</span>
-									{/if}
-								</div>
-							</button>
-							<button class="queue-add-btn" onclick={() => addToQueue(item)} aria-label="Add to queue">+</button>
-						</div>
+						<MediaCard
+							media={item}
+							onPlay={() => playLive(item)}
+							onQueue={() => addToQueue(item)}
+							metaText={item.meta?.event_name ?? ''}
+						/>
 					{/each}
 				</div>
 			{:else}
 				<!-- Live sub: show in list view with grouping -->
 				{#each [...liveGroups] as [groupName, items]}
 					{#if groupBy !== 'none'}
-						<h3 class="group-title">{groupName}</h3>
+						<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">{groupName}</h3>
 					{/if}
-					<ul class="item-list">
+					<ul class="list-none p-0">
 						{#each items as item}
-							<li class="item-row" class:playing={playerStore.state.mediaId === item.id}>
-								<button class="item-link" onclick={() => playLive(item)}>
+							<li class="flex items-center border-b border-base-300" class:bg-base-200={playerStore.state.mediaId === item.id} class:border-l-4={playerStore.state.mediaId === item.id} class:border-l-primary={playerStore.state.mediaId === item.id}>
+								<button class="flex items-center gap-4 flex-1 min-w-0 py-3 px-1 text-left cursor-pointer bg-transparent border-none active:scale-[0.98] transition-transform" onclick={() => playLive(item)}>
 									{#if item.thumbnail_path}
-										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="thumb" />
+										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="w-[120px] h-[68px] object-cover rounded-lg bg-base-300 flex-shrink-0" />
 									{:else}
-										<div class="thumb-placeholder-sm"></div>
+										<div class="w-[120px] h-[68px] bg-base-300 rounded-lg flex-shrink-0"></div>
 									{/if}
-									<div class="item-info">
-										<span class="item-title">{item.title}</span>
+									<div class="flex flex-col gap-1">
+										<span class="text-sm" class:text-primary={playerStore.state.mediaId === item.id}>{item.title}</span>
 										{#if item.meta?.event_name}
-											<span class="item-meta">{item.meta.event_name}</span>
+											<span class="text-xs text-base-content/50">{item.meta.event_name}</span>
 										{/if}
 										{#if item.tags?.length > 0}
-											<div class="item-tags">
+											<div class="flex gap-1 flex-wrap">
 												{#each item.tags as tag}
-													<span class="tag">{tag.name}</span>
+													<span class="badge badge-outline badge-xs">{tag.name}</span>
 												{/each}
 											</div>
 										{/if}
 									</div>
 								</button>
-								<button class="queue-add-btn-list" onclick={() => addToQueue(item)} aria-label="Add to queue">
-									<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+								<button class="btn btn-ghost btn-sm btn-circle flex-shrink-0" onclick={() => addToQueue(item)} aria-label="Add to queue">
+									<Plus size={18} />
 								</button>
 							</li>
 						{/each}
@@ -219,321 +169,3 @@
 		{/if}
 	{/if}
 </div>
-
-<style>
-	.list-page {
-		max-width: 960px;
-		margin: 0 auto;
-		padding: 1rem;
-	}
-
-	header {
-		margin-bottom: 1.5rem;
-	}
-
-	/* Sub-category chips */
-	.sub-chips {
-		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-	}
-
-	.sub-chips a {
-		padding: 0.4rem 1rem;
-		background: var(--color-surface);
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		border-radius: var(--radius-pill);
-		font-size: var(--font-size-sm);
-		font-weight: 500;
-	}
-
-	.sub-chips a.active {
-		background: var(--color-accent);
-		color: var(--color-text);
-	}
-
-	/* Filters (genre / tag) */
-	.filters {
-		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.filters a {
-		padding: 0.3rem 0.75rem;
-		background: var(--color-surface);
-		color: var(--color-text-muted);
-		text-decoration: none;
-		border-radius: var(--radius-pill);
-		font-size: var(--font-size-sm);
-	}
-
-	.filters a.active {
-		background: var(--color-accent);
-		color: var(--color-text);
-	}
-
-	/* Group-by toggle */
-	.group-toggle {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-		margin-bottom: 1rem;
-	}
-
-	.group-toggle button {
-		padding: 0.25rem 0.6rem;
-		background: var(--color-surface);
-		color: var(--color-text-muted);
-		border: none;
-		border-radius: var(--radius-sm);
-		cursor: pointer;
-		font-size: var(--font-size-sm);
-	}
-
-	.group-toggle button.active {
-		background: var(--color-accent);
-		color: var(--color-text);
-	}
-
-	.empty {
-		color: var(--color-text-muted);
-		text-align: center;
-		padding: 3rem;
-	}
-
-	/* Section titles for "All" mode */
-	.section-title {
-		color: var(--color-text-secondary);
-		font-size: var(--font-size-lg);
-		margin: 1.5rem 0 0.75rem;
-		padding-bottom: 0.25rem;
-		border-bottom: 1px solid var(--color-border);
-	}
-
-	.section-title:first-of-type {
-		margin-top: 0.5rem;
-	}
-
-	/* Grid view (movies, all-mode live) */
-	.media-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-		gap: 1rem;
-	}
-
-	.media-card-wrap {
-		position: relative;
-	}
-
-	.media-card {
-		text-decoration: none;
-		color: inherit;
-		transition: transform 0.1s ease;
-		background: none;
-		border: none;
-		padding: 0;
-		cursor: pointer;
-		text-align: left;
-		width: 100%;
-	}
-
-	.media-card:active {
-		transform: scale(0.97);
-	}
-
-	.queue-add-btn {
-		position: absolute;
-		top: 4px;
-		right: 4px;
-		width: 28px;
-		height: 28px;
-		background: rgba(0, 0, 0, 0.6);
-		color: white;
-		border: none;
-		border-radius: 50%;
-		cursor: pointer;
-		font-size: 1.1rem;
-		font-weight: 700;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		line-height: 1;
-		z-index: 1;
-	}
-
-	.queue-add-btn:active {
-		background: var(--color-accent);
-	}
-
-	.thumb-wrap {
-		aspect-ratio: 16 / 9;
-		border-radius: var(--radius-md);
-		overflow: hidden;
-		background: var(--color-surface-alt);
-	}
-
-	.thumb-wrap img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.thumb-placeholder {
-		width: 100%;
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 2rem;
-		color: var(--color-text-muted);
-	}
-
-	.media-info {
-		padding: 0.4rem 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-
-	.media-title {
-		color: var(--color-text);
-		font-size: 0.85rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.media-card:hover .media-title {
-		color: var(--color-accent);
-	}
-
-	.media-meta {
-		color: var(--color-text-muted);
-		font-size: 0.75rem;
-	}
-
-	/* List view (live sub) */
-	.group-title {
-		color: var(--color-text-muted);
-		font-size: 1rem;
-		margin: 1.5rem 0 0.5rem;
-		border-bottom: 1px solid var(--color-border);
-		padding-bottom: 0.25rem;
-	}
-
-	.item-list {
-		list-style: none;
-		padding: 0;
-	}
-
-	.item-list li {
-		border-bottom: 1px solid var(--color-surface-alt);
-	}
-
-	.item-row {
-		display: flex;
-		align-items: center;
-	}
-
-	.item-row.playing {
-		background: var(--color-surface);
-		border-left: 3px solid var(--color-accent);
-	}
-
-	.item-link {
-		display: flex;
-		gap: 1rem;
-		padding: 0.75rem 0;
-		text-decoration: none;
-		align-items: center;
-		transition: transform 0.1s ease;
-		background: none;
-		border: none;
-		cursor: pointer;
-		flex: 1;
-		min-width: 0;
-		color: inherit;
-	}
-
-	.item-link:active {
-		transform: scale(0.98);
-	}
-
-	.queue-add-btn-list {
-		background: none;
-		border: none;
-		color: var(--color-text-muted);
-		cursor: pointer;
-		padding: 8px;
-		flex-shrink: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--radius-sm);
-	}
-
-	.queue-add-btn-list:active {
-		color: var(--color-accent);
-	}
-
-	.thumb {
-		width: 120px;
-		height: 68px;
-		object-fit: cover;
-		border-radius: var(--radius-sm);
-		background: var(--color-surface-alt);
-		flex-shrink: 0;
-	}
-
-	.thumb-placeholder-sm {
-		width: 120px;
-		height: 68px;
-		background: var(--color-surface-alt);
-		border-radius: var(--radius-sm);
-		flex-shrink: 0;
-	}
-
-	.item-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.item-title {
-		color: var(--color-text);
-		font-size: 0.95rem;
-	}
-
-	.item-link:hover .item-title {
-		color: var(--color-accent);
-	}
-
-	.item-meta {
-		color: var(--color-text-muted);
-		font-size: 0.8rem;
-	}
-
-	.item-tags {
-		display: flex;
-		gap: 0.3rem;
-		flex-wrap: wrap;
-	}
-
-	.tag {
-		padding: 0.15rem 0.5rem;
-		background: var(--color-surface);
-		border-radius: var(--radius-pill);
-		font-size: 0.7rem;
-		color: var(--color-text-muted);
-	}
-
-	.playing .media-title,
-	.playing .item-title {
-		color: var(--color-accent);
-	}
-</style>
