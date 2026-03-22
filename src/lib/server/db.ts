@@ -56,6 +56,15 @@ export function createDatabase(dbPath: string): Database.Database {
 			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 		);
 
+		CREATE TABLE IF NOT EXISTS media_chapters (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			media_id INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+			start_time REAL NOT NULL,
+			end_time REAL NOT NULL,
+			title TEXT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_chapters_media ON media_chapters(media_id);
+
 		CREATE TABLE IF NOT EXISTS media_metadata (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			media_id INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,

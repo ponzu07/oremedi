@@ -495,6 +495,24 @@
 			<div class="vp-offline-badge">Offline playback</div>
 		{/if}
 
+		{#if data.chapters.length > 0}
+			<div class="vp-chapters">
+				<h3 class="vp-chapters-title">Chapters</h3>
+				<div class="vp-chapters-list">
+					{#each data.chapters as chapter, i}
+						<button
+							class="vp-chapter-item"
+							class:vp-chapter-active={playerStore.state.currentTime >= chapter.start_time && playerStore.state.currentTime < chapter.end_time}
+							onclick={() => playerStore.seek(chapter.start_time)}
+						>
+							<span class="vp-chapter-time">{formatTime(chapter.start_time)}</span>
+							<span class="vp-chapter-name">{chapter.title}</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		{#if media.metadata && (media.metadata as any[]).length > 0}
 			<details class="vp-details">
 				<summary>詳細情報</summary>
@@ -1111,6 +1129,67 @@
 		border-radius: 0.5rem;
 		font-size: 0.875rem;
 		margin-top: 0.5rem;
+	}
+
+	.vp-chapters {
+		margin-top: 1rem;
+	}
+
+	.vp-chapters-title {
+		font-size: 1rem;
+		font-weight: 700;
+		margin: 0 0 0.5rem;
+		color: var(--color-base-content);
+	}
+
+	.vp-chapters-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.vp-chapter-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.6rem 0.5rem;
+		background: none;
+		border: none;
+		border-left: 3px solid transparent;
+		border-radius: 0.25rem;
+		color: var(--color-base-content);
+		cursor: pointer;
+		text-align: left;
+		width: 100%;
+		font-size: 0.875rem;
+	}
+
+	.vp-chapter-item:active {
+		background: var(--color-base-200);
+	}
+
+	.vp-chapter-active {
+		border-left-color: var(--color-primary);
+		background: var(--color-base-200);
+	}
+
+	.vp-chapter-active .vp-chapter-name {
+		color: var(--color-primary);
+		font-weight: 600;
+	}
+
+	.vp-chapter-time {
+		font-size: 0.75rem;
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+		font-variant-numeric: tabular-nums;
+		min-width: 3.5em;
+	}
+
+	.vp-chapter-name {
+		flex: 1;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.vp-details {

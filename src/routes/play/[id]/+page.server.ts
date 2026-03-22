@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import type { Media } from '$lib/types';
 import { getDb } from '$lib/server/database';
+import { getChapters } from '$lib/server/chapters';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -29,5 +30,7 @@ export const load: PageServerLoad = async ({ params }) => {
 			'SELECT id, title, category, thumbnail_path FROM media WHERE category = ? ORDER BY title'
 		).all(media.category) as { id: number; title: string; category: string; thumbnail_path: string | null }[];
 
-	return { media: { ...media, metadata, tags }, siblingMedia };
+	const chapters = getChapters(db, media.id);
+
+	return { media: { ...media, metadata, tags }, siblingMedia, chapters };
 };

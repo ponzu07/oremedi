@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import type Database from 'better-sqlite3';
 import { computeFileHash } from '$lib/server/file-hash';
+import { extractChapters, saveChapters } from '$lib/server/chapters';
 
 const BROWSER_COMPATIBLE = new Set(['.mp4']);
 const AUDIO_ONLY = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma']);
@@ -142,10 +143,12 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 				const thumbPath = path.join(fileDir, `${baseName}-thumb.jpg`);
 				generateThumbnail(next.original_path, thumbPath, () => {
 					const duration = getDuration(next.original_path);
+					const chapters = extractChapters(next.original_path);
+					if (chapters.length > 0) saveChapters(db, next.id, chapters);
 					db.prepare(
 						"UPDATE media SET transcode_status = 'skipped', transcode_progress = 100, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
 					).run(thumbPath, duration ? Math.round(duration) : null, next.id);
-					console.log(`[transcoder] Skipped (compatible video): "${next.title}"`);
+					console.log(`[transcoder] Skipped (compatible video): "${next.title}" [${chapters.length} chapters]`);
 					setTimeout(processNext, 1000);
 				});
 			}
@@ -163,6 +166,12 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 
 		const handleComplete = (code: number | null) => {
 			if (code === 0) {
+				// Extract chapters from original file before it gets moved
+				if (!isAudio) {
+					const chapters = extractChapters(next.original_path);
+					if (chapters.length > 0) saveChapters(db, next.id, chapters);
+				}
+
 				const afterTranscode = () => {
 					const relativePath = path.relative(mediaPath, next.original_path);
 					const backupPath = path.join(originalsPath, relativePath);
