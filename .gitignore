@@ -29,7 +29,7 @@ data/
 .superpowers/
 
 # Design docs (local only)
-docs/superpowers/
+docs/
 
 # IDE
 .vscode/
