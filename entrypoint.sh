@@ -9,7 +9,7 @@ if [ "$PUID" != "0" ]; then
 
     chown -R "$PUID:$PGID" /app /data 2>/dev/null || true
 
-    exec su-exec appuser node build
+    exec gosu appuser node build
 else
     exec node build
 fi
