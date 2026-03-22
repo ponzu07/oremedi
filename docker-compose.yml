@@ -3,6 +3,8 @@ services:
     build: .
     ports:
       - "3000:3000"
+    devices:
+      - /dev/dri:/dev/dri
     volumes:
       - /volume1/docker/oremedi/media:/media
       - /volume1/docker/oremedi/media-originals:/media-originals
