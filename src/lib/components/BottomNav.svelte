@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Home, Play, Music, Mic, Download } from 'lucide-svelte';
+	import { Search, Play, Music, Mic, Download } from 'lucide-svelte';
 
 	let { mediaCategory }: { mediaCategory?: string } = $props();
 
 	const navItems = [
-		{ href: '/', label: 'Home', icon: Home },
+		{ href: '/search', label: 'Search', icon: Search },
 		{ href: '/video', label: 'Video', icon: Play },
 		{ href: '/music', label: 'Music', icon: Music },
 		{ href: '/voice', label: 'Voice', icon: Mic },
@@ -14,7 +14,7 @@
 
 	function isActive(href: string): boolean {
 		const path = page.url.pathname;
-		if (href === '/') return path === '/';
+		if (href === '/search') return path === '/search';
 
 		if (path.startsWith('/play/') && mediaCategory) {
 			if (href === '/video') return ['movie', 'live_video'].includes(mediaCategory);
