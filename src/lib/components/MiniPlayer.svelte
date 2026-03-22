@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { playerStore, isVideoCategory } from '$lib/stores/player.svelte';
+	import { SkipBack, SkipForward, Play, Pause } from 'lucide-svelte';
 
 	const ps = $derived(playerStore.state);
 	const isVideo = $derived(isVideoCategory(ps.category));
@@ -99,28 +100,17 @@
 			<!-- Center: prev / play-pause / next -->
 			<div class="mini-controls">
 				<button class="mini-btn" title="Previous" onclick={() => playerStore.previous()}>
-					<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-						<rect x="4" y="6" width="2.5" height="12" rx="0.5" />
-						<polygon points="19,6 9,12 19,18" />
-					</svg>
+					<SkipBack size={22} />
 				</button>
 				<button class="mini-btn" title={ps.isPlaying ? 'Pause' : 'Play'} onclick={() => playerStore.togglePlayPause()}>
 					{#if ps.isPlaying}
-						<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-							<rect x="6" y="4" width="4" height="16" />
-							<rect x="14" y="4" width="4" height="16" />
-						</svg>
+						<Pause size={24} />
 					{:else}
-						<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-							<polygon points="5,3 19,12 5,21" />
-						</svg>
+						<Play size={24} />
 					{/if}
 				</button>
 				<button class="mini-btn" title="Next" onclick={() => playerStore.next()}>
-					<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-						<polygon points="5,6 15,12 5,18" />
-						<rect x="17.5" y="6" width="2.5" height="12" rx="0.5" />
-					</svg>
+					<SkipForward size={22} />
 				</button>
 			</div>
 
@@ -148,7 +138,7 @@
 		background: rgba(26, 26, 26, 0.95);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
-		border-top: 1px solid var(--color-border);
+		border-top: 1px solid oklch(var(--b3));
 		display: flex;
 		flex-direction: column;
 		z-index: 99;
@@ -173,13 +163,13 @@
 	.seekbar-track {
 		width: 100%;
 		height: 4px;
-		background: var(--color-border);
+		background: oklch(var(--b3));
 		position: relative;
 	}
 
 	.seekbar-fill {
 		height: 100%;
-		background: var(--color-accent);
+		background: oklch(var(--p));
 		transition: width 0.1s linear;
 	}
 
@@ -206,7 +196,7 @@
 	.mini-thumb {
 		width: 40px;
 		height: 40px;
-		border-radius: var(--radius-sm);
+		border-radius: 0.5rem;
 		object-fit: cover;
 		flex-shrink: 0;
 	}
@@ -214,13 +204,13 @@
 	.mini-thumb-placeholder {
 		width: 40px;
 		height: 40px;
-		border-radius: var(--radius-sm);
-		background: #2a2a3a;
+		border-radius: 0.5rem;
+		background: oklch(var(--b3));
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 1.2rem;
-		color: var(--color-text-muted);
+		color: oklch(var(--bc) / 0.5);
 		flex-shrink: 0;
 	}
 
@@ -233,8 +223,8 @@
 	}
 
 	.mini-title {
-		color: var(--color-text);
-		font-size: var(--font-size-base);
+		color: oklch(var(--bc));
+		font-size: 1rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -256,14 +246,14 @@
 		height: 36px;
 		background: none;
 		border: none;
-		color: var(--color-text);
+		color: oklch(var(--bc));
 		cursor: pointer;
 		border-radius: 50%;
 		padding: 0;
 	}
 
 	.mini-btn:hover {
-		background: var(--color-border);
+		background: oklch(var(--b3));
 	}
 
 	/* Right: speed button */
@@ -272,10 +262,10 @@
 		min-width: 3rem;
 		height: 32px;
 		background: none;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		color: var(--color-text);
-		font-size: var(--font-size-sm);
+		border: 1px solid oklch(var(--b3));
+		border-radius: 0.5rem;
+		color: oklch(var(--bc));
+		font-size: 0.875rem;
 		font-weight: 600;
 		cursor: pointer;
 		padding: 0 0.375rem;
@@ -283,6 +273,6 @@
 	}
 
 	.speed-btn:hover {
-		background: var(--color-border);
+		background: oklch(var(--b3));
 	}
 </style>
