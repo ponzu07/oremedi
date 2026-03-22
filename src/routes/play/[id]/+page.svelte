@@ -981,7 +981,7 @@
 	}
 
 	.vp-btn.vp-active {
-		color: oklch(var(--p));
+		color: var(--color-primary);
 	}
 
 	.vp-rate-btn {
@@ -1047,7 +1047,7 @@
 		right: -2px;
 		font-size: 0.5rem;
 		font-weight: 700;
-		color: oklch(var(--p));
+		color: var(--color-primary);
 		line-height: 1;
 	}
 
@@ -1070,7 +1070,7 @@
 	}
 
 	.vp-resume-btn {
-		background: oklch(var(--p));
+		background: var(--color-primary);
 		color: white;
 		border: none;
 		border-radius: 9999px;
@@ -1113,7 +1113,7 @@
 	}
 
 	.vp-info-subtitle {
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		font-size: 0.875rem;
 		white-space: nowrap;
 		overflow: hidden;
@@ -1123,8 +1123,8 @@
 	.vp-offline-badge {
 		display: inline-block;
 		padding: 0.2rem 0.6rem;
-		background: oklch(var(--b2));
-		color: oklch(var(--bc) / 0.5);
+		background: var(--color-base-200);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		border-radius: 0.5rem;
 		font-size: 0.875rem;
 		margin-top: 0.5rem;
@@ -1135,7 +1135,7 @@
 	}
 
 	.vp-details summary {
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		font-size: 0.875rem;
 		cursor: pointer;
 		user-select: none;
@@ -1150,7 +1150,7 @@
 	}
 
 	.vp-meta-grid dt {
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 	}
 
 	.vp-meta-grid dd {
@@ -1169,8 +1169,8 @@
 		align-items: center;
 		gap: 0.35rem;
 		padding: 0.5rem 1rem;
-		background: oklch(var(--b2));
-		color: oklch(var(--bc));
+		background: var(--color-base-200);
+		color: var(--color-base-content);
 		border: none;
 		border-radius: 0.5rem;
 		cursor: pointer;
@@ -1178,20 +1178,20 @@
 	}
 
 	.vp-action-btn:active {
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 	}
 
 	/* Video queue */
 	.vp-queue {
 		padding: 0.75rem 1rem 2rem;
-		border-top: 1px solid oklch(var(--b3));
+		border-top: 1px solid var(--color-base-300);
 	}
 
 	.vp-queue-title {
 		font-size: 1rem;
 		font-weight: 700;
 		margin: 0 0 0.5rem;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 	}
 
 	.vp-queue-list {
@@ -1209,7 +1209,7 @@
 		background: none;
 		border: none;
 		border-left: 3px solid transparent;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		text-align: left;
 		cursor: pointer;
 		width: 100%;
@@ -1217,12 +1217,12 @@
 	}
 
 	.vp-queue-item:active {
-		background: oklch(var(--b2));
+		background: var(--color-base-200);
 	}
 
 	.vp-queue-current {
-		border-left-color: oklch(var(--p));
-		background: oklch(var(--b2));
+		border-left-color: var(--color-primary);
+		background: var(--color-base-200);
 	}
 
 	.vp-queue-thumb {
@@ -1230,7 +1230,7 @@
 		height: 32px;
 		border-radius: 4px;
 		overflow: hidden;
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -1244,7 +1244,7 @@
 	}
 
 	.vp-queue-thumb-placeholder {
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		opacity: 0.5;
 	}
 
@@ -1258,7 +1258,7 @@
 	.vp-queue-remove {
 		background: none;
 		border: none;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		cursor: pointer;
 		padding: 4px;
 		flex-shrink: 0;
@@ -1273,7 +1273,7 @@
 	}
 
 	.downloaded-badge {
-		color: oklch(var(--p));
+		color: var(--color-primary);
 		font-size: 1rem;
 	}
 
@@ -1288,14 +1288,14 @@
 	.progress-bar {
 		flex: 1;
 		height: 6px;
-		background: oklch(var(--b2));
+		background: var(--color-base-200);
 		border-radius: 0.5rem;
 		overflow: hidden;
 	}
 
 	.progress-fill {
 		height: 100%;
-		background: oklch(var(--p));
+		background: var(--color-primary);
 		transition: width 0.2s;
 	}
 
@@ -1307,7 +1307,7 @@
 		max-width: 428px;
 		margin: 0 auto;
 		padding: 0 1rem;
-		background: oklch(var(--b1));
+		background: var(--color-base-100);
 	}
 
 	/* Header */
@@ -1322,7 +1322,7 @@
 	.amp-header-btn {
 		background: none;
 		border: none;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		cursor: pointer;
 		padding: 4px;
 		border-radius: 0.5rem;
@@ -1336,12 +1336,12 @@
 	}
 
 	.amp-header-btn.amp-active {
-		color: oklch(var(--p));
+		color: var(--color-primary);
 	}
 
 	.amp-header-title {
 		font-size: 0.875rem;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		font-weight: 600;
@@ -1369,7 +1369,7 @@
 		aspect-ratio: 1;
 		border-radius: 16px;
 		overflow: hidden;
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1394,7 +1394,7 @@
 	}
 
 	.amp-placeholder {
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		opacity: 0.5;
 	}
 
@@ -1407,7 +1407,7 @@
 	.amp-title {
 		font-size: 1.25rem;
 		font-weight: 700;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -1415,7 +1415,7 @@
 
 	.amp-subtitle {
 		font-size: 0.875rem;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		margin-top: 0.2rem;
 		white-space: nowrap;
 		overflow: hidden;
@@ -1432,7 +1432,7 @@
 		appearance: none;
 		width: 100%;
 		height: 4px;
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 		border-radius: 2px;
 		outline: none;
 		cursor: pointer;
@@ -1443,7 +1443,7 @@
 		appearance: none;
 		width: 14px;
 		height: 14px;
-		background: oklch(var(--bc));
+		background: var(--color-base-content);
 		border-radius: 50%;
 		cursor: pointer;
 		border: none;
@@ -1452,7 +1452,7 @@
 	.amp-seek-bar::-moz-range-thumb {
 		width: 14px;
 		height: 14px;
-		background: oklch(var(--bc));
+		background: var(--color-base-content);
 		border-radius: 50%;
 		cursor: pointer;
 		border: none;
@@ -1468,7 +1468,7 @@
 		justify-content: space-between;
 		margin-top: 0.35rem;
 		font-size: 0.7rem;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -1483,7 +1483,7 @@
 	.amp-ctrl-btn {
 		background: none;
 		border: none;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
@@ -1525,13 +1525,13 @@
 	.amp-ctrl-play {
 		width: 64px;
 		height: 64px;
-		background: oklch(var(--p));
+		background: var(--color-primary);
 		border-radius: 50%;
 		flex-shrink: 0;
 	}
 
 	.amp-ctrl-btn.amp-active {
-		color: oklch(var(--p));
+		color: var(--color-primary);
 	}
 
 	.amp-repeat-btn {
@@ -1544,7 +1544,7 @@
 		right: 2px;
 		font-size: 0.5rem;
 		font-weight: 700;
-		color: oklch(var(--p));
+		color: var(--color-primary);
 		line-height: 1;
 	}
 
@@ -1559,7 +1559,7 @@
 	.amp-sub-btn {
 		background: none;
 		border: none;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		cursor: pointer;
 		font-size: 0.875rem;
 		font-weight: 600;
@@ -1576,7 +1576,7 @@
 
 	.amp-dl-pct {
 		font-size: 0.875rem;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 	}
 
 	/* Queue view */
@@ -1590,11 +1590,11 @@
 		font-size: 1.1rem;
 		font-weight: 700;
 		margin: 0 0 0.75rem;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 	}
 
 	.amp-queue-empty {
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		text-align: center;
 		padding: 2rem 0;
 	}
@@ -1614,7 +1614,7 @@
 		background: none;
 		border: none;
 		border-left: 3px solid transparent;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		text-align: left;
 		cursor: pointer;
 		width: 100%;
@@ -1622,12 +1622,12 @@
 	}
 
 	.amp-queue-item:active {
-		background: oklch(var(--b2));
+		background: var(--color-base-200);
 	}
 
 	.amp-queue-current {
-		border-left-color: oklch(var(--p));
-		background: oklch(var(--b2));
+		border-left-color: var(--color-primary);
+		background: var(--color-base-200);
 	}
 
 	.amp-queue-thumb {
@@ -1635,7 +1635,7 @@
 		height: 40px;
 		border-radius: 4px;
 		overflow: hidden;
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -1649,7 +1649,7 @@
 	}
 
 	.amp-queue-thumb-placeholder {
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		opacity: 0.5;
 	}
 
@@ -1663,7 +1663,7 @@
 	.amp-queue-remove {
 		background: none;
 		border: none;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		cursor: pointer;
 		padding: 4px;
 		flex-shrink: 0;

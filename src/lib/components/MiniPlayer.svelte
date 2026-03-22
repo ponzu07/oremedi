@@ -131,14 +131,14 @@
 <style>
 	.mini-player {
 		position: fixed;
-		bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+		bottom: 3.5rem; /* dock-sm height */
 		left: 0;
 		right: 0;
 		height: 64px;
-		background: rgba(26, 26, 26, 0.95);
+		background: color-mix(in oklab, var(--color-base-100) 95%, transparent);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
-		border-top: 1px solid oklch(var(--b3));
+		border-top: 1px solid var(--color-base-300);
 		display: flex;
 		flex-direction: column;
 		z-index: 99;
@@ -163,13 +163,13 @@
 	.seekbar-track {
 		width: 100%;
 		height: 4px;
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 		position: relative;
 	}
 
 	.seekbar-fill {
 		height: 100%;
-		background: oklch(var(--p));
+		background: var(--color-primary);
 		transition: width 0.1s linear;
 	}
 
@@ -205,12 +205,12 @@
 		width: 40px;
 		height: 40px;
 		border-radius: 0.5rem;
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 1.2rem;
-		color: oklch(var(--bc) / 0.5);
+		color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 		flex-shrink: 0;
 	}
 
@@ -223,7 +223,7 @@
 	}
 
 	.mini-title {
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		font-size: 1rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -246,14 +246,14 @@
 		height: 36px;
 		background: none;
 		border: none;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		cursor: pointer;
 		border-radius: 50%;
 		padding: 0;
 	}
 
 	.mini-btn:hover {
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 	}
 
 	/* Right: speed button */
@@ -262,9 +262,9 @@
 		min-width: 3rem;
 		height: 32px;
 		background: none;
-		border: 1px solid oklch(var(--b3));
+		border: 1px solid var(--color-base-300);
 		border-radius: 0.5rem;
-		color: oklch(var(--bc));
+		color: var(--color-base-content);
 		font-size: 0.875rem;
 		font-weight: 600;
 		cursor: pointer;
@@ -273,6 +273,6 @@
 	}
 
 	.speed-btn:hover {
-		background: oklch(var(--b3));
+		background: var(--color-base-300);
 	}
 </style>

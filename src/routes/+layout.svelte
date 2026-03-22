@@ -99,7 +99,7 @@
 
 	.gvw-mini {
 		position: fixed;
-		bottom: calc(52px + env(safe-area-inset-bottom, 0px) + 52px);
+		bottom: calc(3.5rem + 64px); /* dock-sm + mini-player */
 		left: 8px;
 		width: 120px;
 		height: 68px;
