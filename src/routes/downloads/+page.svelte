@@ -9,6 +9,7 @@
 		type DownloadStatus
 	} from '$lib/download-manager';
 	import { categoryLabels } from '$lib/constants';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 
 	let downloads = $state<
 		{ id: number; title: string; category: string; status: DownloadStatus; size: number; downloadedAt: string }[]
@@ -35,154 +36,45 @@
 		downloaded: 'Downloaded',
 		'needs-redownload': 'Needs re-download'
 	};
-
 </script>
 
-<div class="downloads-page">
-	<header>
-		<h1>Downloads</h1>
-	</header>
+<div class="max-w-[960px] mx-auto p-4">
+	<PageHeader title="Downloads" />
 
-	<div class="storage-info">
-		<div class="storage-bar">
-			<div class="storage-used" style="width: {storage.quota > 0 ? (storage.usage / storage.quota) * 100 : 0}%"></div>
-		</div>
-		<p>
+	<div class="mb-6">
+		<progress
+			class="progress progress-primary w-full"
+			value={storage.quota > 0 ? (storage.usage / storage.quota) * 100 : 0}
+			max="100"
+		></progress>
+		<p class="text-sm text-base-content/50 mt-1">
 			{formatSize(storage.usage)} / {formatSize(storage.quota)} used
 			{#if persistent}
-				<span class="persistent">(persistent)</span>
+				<span class="text-success">(persistent)</span>
 			{:else}
-				<span class="not-persistent">(not persistent - may be cleared by browser)</span>
+				<span class="text-error">(not persistent - may be cleared by browser)</span>
 			{/if}
 		</p>
 	</div>
 
 	{#if downloads.length === 0}
-		<p class="empty">No downloads yet. Download media from the player page.</p>
+		<p class="text-center text-base-content/50 py-12">No downloads yet. Download media from the player page.</p>
 	{:else}
-		<ul class="download-list">
+		<ul class="list-none p-0">
 			{#each downloads as item}
-				<li>
-					<div class="item-info">
-						<a href="/play/{item.id}" class="item-title">{item.title}</a>
-						<span class="item-meta">
+				<li class="flex justify-between items-center py-3 border-b border-base-300">
+					<div class="flex flex-col gap-1">
+						<a href="/play/{item.id}" class="text-sm font-medium hover:text-primary">{item.title}</a>
+						<span class="text-xs text-base-content/50">
 							{categoryLabels[item.category] ?? item.category} — {formatSize(item.size)}
 						</span>
-						<span class="status status-{item.status}">{statusLabels[item.status]}</span>
+						<span class="text-xs {item.status === 'downloaded' ? 'text-success' : item.status === 'needs-redownload' ? 'text-error' : 'text-base-content/50'}">
+							{statusLabels[item.status]}
+						</span>
 					</div>
-					<button onclick={() => handleRemove(item.id)}>Remove</button>
+					<button class="btn btn-ghost btn-sm" onclick={() => handleRemove(item.id)}>Remove</button>
 				</li>
 			{/each}
 		</ul>
 	{/if}
 </div>
-
-<style>
-	.downloads-page {
-		max-width: 960px;
-		margin: 0 auto;
-		padding: 1rem;
-	}
-
-	header {
-		margin-bottom: 1.5rem;
-	}
-
-	.storage-info {
-		margin-bottom: 1.5rem;
-	}
-
-	.storage-bar {
-		height: 8px;
-		background: #222;
-		border-radius: 4px;
-		overflow: hidden;
-		margin-bottom: 0.5rem;
-	}
-
-	.storage-used {
-		height: 100%;
-		background: #4a9eff;
-		transition: width 0.3s;
-	}
-
-	.storage-info p {
-		font-size: 0.875rem;
-		color: #888;
-		margin: 0;
-	}
-
-	.persistent {
-		color: #4a4;
-	}
-
-	.not-persistent {
-		color: #a44;
-	}
-
-	.empty {
-		color: #666;
-		text-align: center;
-		padding: 3rem;
-	}
-
-	.download-list {
-		list-style: none;
-		padding: 0;
-	}
-
-	.download-list li {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.75rem;
-		border-bottom: 1px solid #222;
-	}
-
-	.item-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.item-title {
-		color: #fff;
-		text-decoration: none;
-		font-weight: 500;
-	}
-
-	.item-title:hover {
-		color: #4a9eff;
-	}
-
-	.item-meta {
-		font-size: 0.8rem;
-		color: #888;
-	}
-
-	.status {
-		font-size: 0.75rem;
-	}
-
-	.status-downloaded {
-		color: #4a4;
-	}
-
-	.status-needs-redownload {
-		color: #a44;
-	}
-
-	button {
-		padding: 0.4rem 0.75rem;
-		background: #333;
-		color: #fff;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-		font-size: 0.8rem;
-	}
-
-	button:hover {
-		background: #444;
-	}
-</style>
