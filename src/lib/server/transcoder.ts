@@ -28,6 +28,25 @@ function detectHwAccel(): HwAccel {
 	return 'none';
 }
 
+function getDuration(filePath: string): number | null {
+	try {
+		const result = execSync(
+			`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+			{ stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
+		);
+		const duration = parseFloat(result.trim());
+		return isNaN(duration) ? null : duration;
+	} catch {
+		return null;
+	}
+}
+
+function parseTimeToSeconds(timeStr: string): number {
+	const match = timeStr.match(/(\d+):(\d+):(\d+)\.(\d+)/);
+	if (!match) return 0;
+	return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]) + parseInt(match[4]) / 100;
+}
+
 function buildVideoArgs(input: string, output: string, hwAccel: HwAccel): string[] {
 	if (hwAccel === 'vaapi') {
 		return [
@@ -56,6 +75,35 @@ function buildVideoArgs(input: string, output: string, hwAccel: HwAccel): string
 	];
 }
 
+function runFfmpeg(
+	args: string[],
+	db: Database.Database,
+	mediaId: number,
+	totalDuration: number | null,
+	onClose: (code: number | null) => void
+) {
+	const ffmpeg = spawn('ffmpeg', args);
+	let lastProgress = 0;
+
+	if (totalDuration && totalDuration > 0) {
+		ffmpeg.stderr.on('data', (data: Buffer) => {
+			const line = data.toString();
+			const timeMatch = line.match(/time=(\d+:\d+:\d+\.\d+)/);
+			if (timeMatch) {
+				const currentTime = parseTimeToSeconds(timeMatch[1]);
+				const progress = Math.min(99, Math.round((currentTime / totalDuration) * 100));
+				if (progress > lastProgress) {
+					lastProgress = progress;
+					db.prepare("UPDATE media SET transcode_progress = ? WHERE id = ?").run(progress, mediaId);
+				}
+			}
+		});
+	}
+
+	ffmpeg.on('close', onClose);
+	ffmpeg.on('error', () => onClose(-1));
+}
+
 export function startTranscodeWorker(db: Database.Database, mediaPath: string, originalsPath: string) {
 	const hwAccel = detectHwAccel();
 	if (hwAccel === 'vaapi') {
@@ -74,7 +122,8 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 			return;
 		}
 
-		db.prepare("UPDATE media SET transcode_status = 'processing' WHERE id = ?").run(next.id);
+		db.prepare("UPDATE media SET transcode_status = 'processing', transcode_progress = 0 WHERE id = ?").run(next.id);
+		console.log(`[transcoder] Processing: "${next.title}"`);
 
 		const ext = path.extname(next.original_path).toLowerCase();
 		const isAudio = AUDIO_ONLY.has(ext);
@@ -84,21 +133,25 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 		if (BROWSER_COMPATIBLE.has(ext) || BROWSER_COMPATIBLE_AUDIO.has(ext)) {
 			if (isAudio) {
 				db.prepare(
-					"UPDATE media SET transcode_status = 'skipped', updated_at = datetime('now') WHERE id = ?"
+					"UPDATE media SET transcode_status = 'skipped', transcode_progress = 100, updated_at = datetime('now') WHERE id = ?"
 				).run(next.id);
+				console.log(`[transcoder] Skipped (compatible audio): "${next.title}"`);
 				setTimeout(processNext, 1000);
 			} else {
 				const thumbPath = path.join(fileDir, `${baseName}-thumb.jpg`);
 				generateThumbnail(next.original_path, thumbPath, () => {
+					const duration = getDuration(next.original_path);
 					db.prepare(
-						"UPDATE media SET transcode_status = 'skipped', thumbnail_path = ?, updated_at = datetime('now') WHERE id = ?"
-					).run(thumbPath, next.id);
+						"UPDATE media SET transcode_status = 'skipped', transcode_progress = 100, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
+					).run(thumbPath, duration ? Math.round(duration) : null, next.id);
+					console.log(`[transcoder] Skipped (compatible video): "${next.title}"`);
 					setTimeout(processNext, 1000);
 				});
 			}
 			return;
 		}
 
+		const totalDuration = getDuration(next.original_path);
 		const outputExt = isAudio ? '.aac' : '.mp4';
 		const outputPath = path.join(fileDir, `${baseName}${outputExt}`);
 		const thumbPath = isAudio ? null : path.join(fileDir, `${baseName}-thumb.jpg`);
@@ -107,9 +160,7 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 			? ['-i', next.original_path, '-c:a', 'aac', '-b:a', '192k', '-y', outputPath]
 			: buildVideoArgs(next.original_path, outputPath, hwAccel);
 
-		const ffmpeg = spawn('ffmpeg', args);
-
-		ffmpeg.on('close', (code) => {
+		const handleComplete = (code: number | null) => {
 			if (code === 0) {
 				const afterTranscode = () => {
 					const relativePath = path.relative(mediaPath, next.original_path);
@@ -118,8 +169,9 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 					fs.renameSync(next.original_path, backupPath);
 
 					db.prepare(
-						"UPDATE media SET transcode_status = 'ready', original_path = ?, thumbnail_path = ?, updated_at = datetime('now') WHERE id = ?"
-					).run(outputPath, thumbPath, next.id);
+						"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
+					).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, next.id);
+					console.log(`[transcoder] Done: "${next.title}"`);
 					setTimeout(processNext, 1000);
 				};
 
@@ -131,9 +183,9 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 			} else if (code !== 0 && hwAccel !== 'none' && !isAudio) {
 				// VAAPI failed, retry with software encoding
 				console.warn(`[transcoder] VAAPI failed for "${next.title}", retrying with software`);
+				db.prepare("UPDATE media SET transcode_progress = 0 WHERE id = ?").run(next.id);
 				const swArgs = buildVideoArgs(next.original_path, outputPath, 'none');
-				const swFfmpeg = spawn('ffmpeg', swArgs);
-				swFfmpeg.on('close', (swCode) => {
+				runFfmpeg(swArgs, db, next.id, totalDuration, (swCode) => {
 					if (swCode === 0) {
 						const afterTranscode = () => {
 							const relativePath = path.relative(mediaPath, next.original_path);
@@ -142,8 +194,9 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 							fs.renameSync(next.original_path, backupPath);
 
 							db.prepare(
-								"UPDATE media SET transcode_status = 'ready', original_path = ?, thumbnail_path = ?, updated_at = datetime('now') WHERE id = ?"
-							).run(outputPath, thumbPath, next.id);
+								"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
+							).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, next.id);
+							console.log(`[transcoder] Done (software fallback): "${next.title}"`);
 							setTimeout(processNext, 1000);
 						};
 						if (thumbPath) {
@@ -155,29 +208,20 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 						db.prepare(
 							"UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?"
 						).run(next.id);
+						console.error(`[transcoder] Failed: "${next.title}"`);
 						setTimeout(processNext, 5000);
 					}
-				});
-				swFfmpeg.on('error', () => {
-					db.prepare(
-						"UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?"
-					).run(next.id);
-					setTimeout(processNext, 5000);
 				});
 			} else {
 				db.prepare(
 					"UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?"
 				).run(next.id);
+				console.error(`[transcoder] Failed: "${next.title}"`);
 				setTimeout(processNext, 5000);
 			}
-		});
+		};
 
-		ffmpeg.on('error', () => {
-			db.prepare(
-				"UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?"
-			).run(next.id);
-			setTimeout(processNext, 5000);
-		});
+		runFfmpeg(args, db, next.id, totalDuration, handleComplete);
 	};
 
 	setTimeout(processNext, 2000);

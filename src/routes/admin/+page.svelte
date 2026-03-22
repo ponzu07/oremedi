@@ -39,6 +39,39 @@
 			.filter(t => !editTags.some(et => et.name === t.name && et.category === t.category));
 	});
 
+	interface TranscodeQueueItem {
+		id: number;
+		title: string;
+		transcode_status: string;
+		transcode_progress: number;
+	}
+	let transcodeQueue = $state<TranscodeQueueItem[]>(
+		data.transcodeQueue.map(q => ({ id: q.id, title: q.title, transcode_status: q.transcode_status, transcode_progress: q.transcode_progress ?? 0 }))
+	);
+	let transcodePolling = $state(false);
+
+	async function pollTranscodeStatus() {
+		if (transcodePolling) return;
+		transcodePolling = true;
+		try {
+			while (true) {
+				const res = await fetch('/api/transcode/status');
+				const data = await res.json();
+				transcodeQueue = data.queue;
+				if (data.queue.length === 0) break;
+				await new Promise(r => setTimeout(r, 3000));
+			}
+		} finally {
+			transcodePolling = false;
+		}
+	}
+
+	$effect(() => {
+		if (transcodeQueue.length > 0 && !transcodePolling) {
+			pollTranscodeStatus();
+		}
+	});
+
 	let filterCategory = $state<string>('all');
 	let searchQuery = $state('');
 
@@ -277,15 +310,24 @@
 		</div>
 	{/if}
 
-	{#if data.transcodeQueue.length > 0}
+	{#if transcodeQueue.length > 0}
 		<section class="mb-4">
-			<h2 class="text-sm text-base-content/70 mb-2">変換キュー</h2>
-			{#each data.transcodeQueue as item}
-				<div class="alert alert-info mb-1 py-2">
-					<span class="text-sm truncate">{item.title}</span>
-					<span class="text-xs" class:text-primary={item.transcode_status === 'processing'}>
-						{statusLabels[item.transcode_status] ?? item.transcode_status}
-					</span>
+			<h2 class="text-sm text-base-content/70 mb-2">変換キュー ({transcodeQueue.length}件)</h2>
+			{#each transcodeQueue as item (item.id)}
+				<div class="bg-base-200 rounded-box px-3 py-2 mb-1">
+					<div class="flex items-center justify-between mb-1">
+						<span class="text-sm truncate flex-1">{item.title}</span>
+						<span class="text-xs ml-2 {item.transcode_status === 'processing' ? 'text-primary' : 'text-base-content/50'}">
+							{#if item.transcode_status === 'processing'}
+								{item.transcode_progress}%
+							{:else}
+								{statusLabels[item.transcode_status] ?? item.transcode_status}
+							{/if}
+						</span>
+					</div>
+					{#if item.transcode_status === 'processing'}
+						<progress class="progress progress-primary w-full h-1.5" value={item.transcode_progress} max="100"></progress>
+					{/if}
 				</div>
 			{/each}
 		</section>

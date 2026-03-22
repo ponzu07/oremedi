@@ -10,6 +10,7 @@ export interface Media {
 	original_path: string;
 	thumbnail_path: string | null;
 	transcode_status: TranscodeStatus;
+	transcode_progress: number;
 	created_at: string;
 	updated_at: string;
 }

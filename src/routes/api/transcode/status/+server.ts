@@ -14,7 +14,7 @@ export const GET: RequestHandler = async () => {
 	).get() as { pending: number; processing: number; failed: number };
 
 	const queue = db.prepare(
-		"SELECT id, title, transcode_status FROM media WHERE transcode_status IN ('pending', 'processing') ORDER BY created_at"
+		"SELECT id, title, transcode_status, transcode_progress FROM media WHERE transcode_status IN ('pending', 'processing') ORDER BY created_at"
 	).all();
 
 	return json({ ...counts, queue });
