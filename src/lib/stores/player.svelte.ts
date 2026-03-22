@@ -399,30 +399,6 @@ function createPlayerStore() {
 		}
 	}
 
-	function stop() {
-		if (audioElement) {
-			audioElement.pause();
-			audioElement.src = '';
-		}
-		if (videoElement) {
-			videoElement.pause();
-			videoElement.src = '';
-		}
-		state.mediaId = null;
-		state.title = '';
-		state.category = '';
-		state.thumbnailPath = null;
-		state.isPlaying = false;
-		state.currentTime = 0;
-		state.duration = 0;
-		state.mediaUrl = '';
-		state.isOffline = false;
-		state.queue = [];
-		state.currentIndex = -1;
-		state.shuffleOrder = [];
-		state.isFullPlayer = false;
-	}
-
 	function seek(time: number) {
 		const el = getActiveElement();
 		if (el) {
@@ -475,7 +451,6 @@ function createPlayerStore() {
 		removeFromQueue,
 		playFromQueue,
 		togglePlayPause,
-		stop,
 		seek,
 		setFullPlayer,
 		getVideoElement,
