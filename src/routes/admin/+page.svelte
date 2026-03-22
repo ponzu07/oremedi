@@ -32,6 +32,8 @@
 	let showNewTagInput = $state(false);
 	let newCategoryName = $state('');
 	let showNewCategoryInput = $state(false);
+	let thumbnailInput: HTMLInputElement | undefined = $state();
+	let uploadingThumbnail = $state(false);
 
 	let availableTags = $derived.by(() => {
 		return data.allTags
@@ -165,6 +167,23 @@
 			uploadFiles = uploadFiles.filter(f => f.status !== 'done');
 			if (uploadFiles.length === 0) showUpload = false;
 			location.reload();
+		}
+	}
+
+	async function uploadThumbnail(id: number, file: File) {
+		uploadingThumbnail = true;
+		const formData = new FormData();
+		formData.append('thumbnail', file);
+		try {
+			const res = await fetch(`/api/media/${id}/thumbnail`, { method: 'POST', body: formData });
+			if (res.ok) {
+				toast.show('サムネイルを更新しました');
+				location.reload();
+			} else {
+				toast.show('サムネイル更新に失敗しました');
+			}
+		} finally {
+			uploadingThumbnail = false;
 		}
 	}
 
@@ -435,6 +454,36 @@
 			<li class="border-b border-base-300">
 				{#if editingId === item.id}
 					<div class="bg-base-200 rounded-box p-4 my-2 flex flex-col gap-2">
+						<div class="flex gap-3 items-start">
+							{#if item.thumbnail_path}
+								<img src={`/api/media/${item.id}/thumbnail`} alt="" class="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
+							{:else}
+								<div class="w-20 h-20 rounded-lg bg-base-300 flex items-center justify-center text-base-content/30 flex-shrink-0 text-2xl">
+									{#if item.category === 'music'}&#9835;{:else if item.category === 'voice'}&#127897;{:else}&#9654;{/if}
+								</div>
+							{/if}
+							<div class="flex flex-col gap-1">
+								<button
+									type="button"
+									class="btn btn-sm btn-ghost"
+									disabled={uploadingThumbnail}
+									onclick={() => thumbnailInput?.click()}
+								>
+									{uploadingThumbnail ? 'アップロード中...' : 'サムネイル変更'}
+								</button>
+								<input
+									bind:this={thumbnailInput}
+									type="file"
+									accept="image/*"
+									class="hidden"
+									onchange={(e) => {
+										const t = e.target as HTMLInputElement;
+										if (t.files?.[0]) uploadThumbnail(item.id, t.files[0]);
+										t.value = '';
+									}}
+								/>
+							</div>
+						</div>
 						<label class="flex flex-col gap-1">
 							<span class="text-xs text-base-content/50">タイトル</span>
 							<input class="input w-full" bind:value={editTitle} />
