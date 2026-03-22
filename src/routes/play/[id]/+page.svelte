@@ -155,10 +155,10 @@
 		if (isVideo) {
 			playerStore.setFullPlayer(false);
 			saveResumePosition();
+			stopResumeInterval();
 			window.removeEventListener('beforeunload', saveResumePosition);
+			if (hideTimer) clearTimeout(hideTimer);
 		}
-		stopResumeInterval();
-		if (hideTimer) clearTimeout(hideTimer);
 	});
 
 	function showControls() {

@@ -33,7 +33,7 @@
 	}
 
 	let groups = $derived(getGroups(data.items, groupBy));
-	const itemIndexMap = new Map(data.items.map((item, i) => [item, i]));
+	const itemIndexMap = $derived(new Map(data.items.map((item, i) => [item, i])));
 
 	function playVoice(index: number) {
 		playerStore.playQueue(data.items.map(buildQueueItem), index);
