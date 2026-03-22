@@ -29,9 +29,9 @@
 
 	$effect(() => {
 		if (typeof document !== 'undefined') {
-			let offset = '60px';
+			let offset = '56px';
 			if (hasPlayer) {
-				offset = isCurrentVideo ? '132px' : '120px';
+				offset = isCurrentVideo ? '128px' : '116px';
 			}
 			document.documentElement.style.setProperty('--bottom-offset', offset);
 		}
