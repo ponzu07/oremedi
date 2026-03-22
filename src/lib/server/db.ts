@@ -34,6 +34,12 @@ export function createDatabase(dbPath: string): Database.Database {
 		db.exec("ALTER TABLE media ADD COLUMN transcode_progress INTEGER NOT NULL DEFAULT 0");
 	}
 
+	// Migrate: add file_hash column if not exists
+	const mediaColsForHash = db.prepare("PRAGMA table_info('media')").all() as { name: string }[];
+	if (mediaColsForHash.length > 0 && !mediaColsForHash.some(c => c.name === 'file_hash')) {
+		db.exec("ALTER TABLE media ADD COLUMN file_hash TEXT");
+	}
+
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS media (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,6 +51,7 @@ export function createDatabase(dbPath: string): Database.Database {
 			transcode_status TEXT NOT NULL DEFAULT 'pending'
 				CHECK(transcode_status IN ('pending', 'processing', 'ready', 'failed', 'skipped')),
 			transcode_progress INTEGER NOT NULL DEFAULT 0,
+			file_hash TEXT,
 			created_at TEXT NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 		);

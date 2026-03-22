@@ -2,6 +2,7 @@ import { spawn, execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import type Database from 'better-sqlite3';
+import { computeFileHash } from '$lib/server/file-hash';
 
 const BROWSER_COMPATIBLE = new Set(['.mp4']);
 const AUDIO_ONLY = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma']);
@@ -168,9 +169,10 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 					fs.mkdirSync(path.dirname(backupPath), { recursive: true });
 					fs.renameSync(next.original_path, backupPath);
 
+					const newHash = computeFileHash(outputPath);
 					db.prepare(
-						"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
-					).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, next.id);
+						"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
+					).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, newHash, next.id);
 					console.log(`[transcoder] Done: "${next.title}"`);
 					setTimeout(processNext, 1000);
 				};
@@ -193,9 +195,10 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 							fs.mkdirSync(path.dirname(backupPath), { recursive: true });
 							fs.renameSync(next.original_path, backupPath);
 
+							const newHash = computeFileHash(outputPath);
 							db.prepare(
-								"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, updated_at = datetime('now') WHERE id = ?"
-							).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, next.id);
+								"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
+							).run(outputPath, thumbPath, totalDuration ? Math.round(totalDuration) : null, newHash, next.id);
 							console.log(`[transcoder] Done (software fallback): "${next.title}"`);
 							setTimeout(processNext, 1000);
 						};

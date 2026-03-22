@@ -8,7 +8,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let scanResult = $state<{ added: number; skipped: number; total: number } | null>(null);
+	let scanResult = $state<{ added: number; moved: number; skipped: number; orphaned: number; total: number } | null>(null);
 	let scanning = $state(false);
 	let showUpload = $state(false);
 	let editingId = $state<number | null>(null);
@@ -325,7 +325,15 @@
 
 	{#if scanResult}
 		<div class="alert alert-success mb-4">
-			スキャン完了: {scanResult.added}件追加 / {scanResult.skipped}件スキップ / {scanResult.total}件検出
+			<div>
+				<p>スキャン完了: {scanResult.total}件検出</p>
+				<p class="text-xs mt-1">
+					{scanResult.added}件追加 / {scanResult.moved}件移動検出 / {scanResult.skipped}件スキップ
+					{#if scanResult.orphaned > 0}
+						/ <span class="text-warning">{scanResult.orphaned}件ファイル不明</span>
+					{/if}
+				</p>
+			</div>
 		</div>
 	{/if}
 

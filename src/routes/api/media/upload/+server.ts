@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
 import { config } from '$lib/server/config';
+import { computeFileHash } from '$lib/server/file-hash';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
@@ -47,7 +48,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	const db = getDb();
-	const insert = db.prepare('INSERT INTO media (title, category, original_path) VALUES (?, ?, ?)');
+	const insert = db.prepare('INSERT INTO media (title, category, original_path, file_hash) VALUES (?, ?, ?, ?)');
 	const results: { id: number; title: string; category: string }[] = [];
 
 	for (const file of files) {
@@ -60,7 +61,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		const nodeStream = Readable.fromWeb(webStream as import('stream/web').ReadableStream);
 		await pipeline(nodeStream, fs.createWriteStream(filePath));
 
-		const result = insert.run(title, cat, filePath);
+		const hash = computeFileHash(filePath);
+		const result = insert.run(title, cat, filePath, hash);
 		results.push({ id: Number(result.lastInsertRowid), title, category: cat });
 	}
 
