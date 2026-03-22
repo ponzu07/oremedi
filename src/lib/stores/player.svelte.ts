@@ -56,6 +56,8 @@ function createPlayerStore() {
 
 	let audioElement: HTMLAudioElement | null = null;
 	let videoElement: HTMLVideoElement | null = null;
+	let videoBindResolve: (() => void) | null = null;
+	let videoReady = false;
 
 	function getActiveElement(): HTMLAudioElement | HTMLVideoElement | null {
 		return isVideoCategory(state.category) ? videoElement : audioElement;
@@ -92,6 +94,11 @@ function createPlayerStore() {
 
 	function bindVideo(el: HTMLVideoElement) {
 		videoElement = el;
+		videoReady = true;
+		if (videoBindResolve) {
+			videoBindResolve();
+			videoBindResolve = null;
+		}
 		el.addEventListener('timeupdate', () => {
 			if (isVideoCategory(state.category)) {
 				state.currentTime = el.currentTime;
@@ -150,6 +157,10 @@ function createPlayerStore() {
 			if (audioElement && !audioElement.paused) {
 				audioElement.pause();
 				audioElement.src = '';
+			}
+			// Wait for video element to be bound (child onMount runs before layout onMount)
+			if (!videoReady) {
+				await new Promise<void>(resolve => { videoBindResolve = resolve; });
 			}
 			if (videoElement) {
 				videoElement.src = url;
