@@ -94,13 +94,13 @@
 		padding: 0.5rem;
 		background: transparent;
 		border: none;
-		color: #aaa;
+		color: oklch(var(--bc) / 0.5);
 		cursor: pointer;
 		border-radius: 4px;
 	}
 
 	.cast-btn:hover {
-		color: #fff;
-		background: #333;
+		color: oklch(var(--bc));
+		background: oklch(var(--b3));
 	}
 </style>
