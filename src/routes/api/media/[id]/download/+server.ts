@@ -4,7 +4,6 @@ import fs from 'fs';
 import path from 'path';
 
 interface MediaRow {
-	id: number;
 	title: string;
 	original_path: string;
 	converted_path: string | null;
@@ -12,7 +11,7 @@ interface MediaRow {
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const media = db.prepare('SELECT id, title, original_path, converted_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
+	const media = db.prepare('SELECT title, original_path, converted_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
 
 	if (!media) {
 		return new Response('Not found', { status: 404 });
