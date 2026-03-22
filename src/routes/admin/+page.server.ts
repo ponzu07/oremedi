@@ -24,6 +24,9 @@ export const load: PageServerLoad = async () => {
 	const mediaWithTags = media.map(m => ({ ...m, tags: tagsByMedia.get(m.id) ?? [] }));
 
 	const allTags = db.prepare('SELECT id, name, category FROM tags ORDER BY category, name').all() as { id: number; name: string; category: string }[];
+	const tagCategories = db.prepare('SELECT DISTINCT category FROM tags ORDER BY category').all() as { category: string }[];
+	const tagCategoryList = tagCategories.map(c => c.category);
+	if (!tagCategoryList.includes('custom')) tagCategoryList.push('custom');
 
-	return { media: mediaWithTags, transcodeQueue, mediaPath: config.mediaPath, allTags };
+	return { media: mediaWithTags, transcodeQueue, mediaPath: config.mediaPath, allTags, tagCategories: tagCategoryList };
 };

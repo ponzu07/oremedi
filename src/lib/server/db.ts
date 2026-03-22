@@ -6,6 +6,22 @@ export function createDatabase(dbPath: string): Database.Database {
 	db.pragma('journal_mode = WAL');
 	db.pragma('foreign_keys = ON');
 
+	// Migrate: remove CHECK constraint from tags.category if it exists
+	const tagsTableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tags'").get() as { sql: string } | undefined;
+	if (tagsTableInfo?.sql?.includes('CHECK')) {
+		db.exec(`
+			ALTER TABLE tags RENAME TO tags_old;
+			CREATE TABLE tags (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				category TEXT NOT NULL,
+				UNIQUE(name, category)
+			);
+			INSERT INTO tags SELECT * FROM tags_old;
+			DROP TABLE tags_old;
+		`);
+	}
+
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS media (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +48,7 @@ export function createDatabase(dbPath: string): Database.Database {
 		CREATE TABLE IF NOT EXISTS tags (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
-			category TEXT NOT NULL CHECK(category IN ('artist', 'speaker', 'genre', 'custom')),
+			category TEXT NOT NULL,
 			UNIQUE(name, category)
 		);
 

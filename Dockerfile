@@ -17,6 +17,7 @@ RUN npm ci --omit=dev
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV BODY_SIZE_LIMIT=Infinity
 EXPOSE 3000
 
 CMD ["node", "build"]
