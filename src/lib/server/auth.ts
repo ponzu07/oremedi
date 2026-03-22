@@ -12,7 +12,7 @@ export function setAuthCookie(cookies: Cookies): void {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',
-		secure: process.env.NODE_ENV === 'production',
+		secure: false,
 		maxAge: 60 * 60 * 24 * 30
 	});
 }
