@@ -12,7 +12,7 @@ interface MediaRow {
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const media = db.prepare('SELECT * FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
+	const media = db.prepare('SELECT id, title, original_path, converted_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
 
 	if (!media) {
 		return new Response('Not found', { status: 404 });

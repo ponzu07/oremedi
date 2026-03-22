@@ -100,7 +100,7 @@
 			playerStore.setFullPlayer(true);
 
 			// If this media is already playing (came from video page), don't restart
-			if (playerStore.state.mediaId !== (media.id)) {
+			if (playerStore.state.mediaId !== media.id) {
 				await playerStore.play(
 					media.id,
 					media.title,
@@ -123,7 +123,7 @@
 			window.addEventListener('beforeunload', saveResumePosition);
 		} else {
 			// Audio: Build queue from all siblings in the same category
-			const siblings = data.siblingMedia ?? [];
+			const siblings = data.siblingMedia;
 			if (siblings.length > 1) {
 				const queue: QueueItem[] = siblings.map(s => ({
 					mediaId: s.id,
@@ -1055,7 +1055,6 @@
 		align-items: center;
 		gap: 0.5rem;
 		z-index: 3;
-		animation: fadeIn 0.3s ease-out;
 	}
 
 	.vp-resume-btn {

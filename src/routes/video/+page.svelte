@@ -48,17 +48,10 @@
 
 	let liveGroups = $derived(getGroups(data.liveItems, groupBy));
 
-	let showLive = $derived(!data.currentSub || data.currentSub === 'live');
-	let showMovies = $derived(!data.currentSub || data.currentSub === 'movie');
 	let totalCount = $derived(data.movies.length + data.liveItems.length);
 
-	function playMovie(movie: any) {
-		playerStore.play(movie.id, movie.title, movie.category, movie.thumbnail_path ?? null);
-		goto(`/play/${movie.id}`);
-	}
-
-	function playLive(item: any) {
-		playerStore.play(item.id, item.title, item.category, item.thumbnail_path ?? null);
+	function playMedia(item: any) {
+		playerStore.play(item.id, item.title, item.category, item.thumbnail_path);
 		goto(`/play/${item.id}`);
 	}
 </script>
@@ -74,12 +67,12 @@
 	</div>
 
 	<!-- Genre filters (movie sub only) -->
-	{#if showMovies && data.genres.length > 0 && data.currentSub === 'movie'}
+	{#if data.currentSub === 'movie' && data.genres.length > 0}
 		<FilterPills tags={data.genres.map(g => ({name: g}))} currentTag={data.currentGenre} baseHref="/video?sub=movie" />
 	{/if}
 
 	<!-- Tag filters (live sub only) -->
-	{#if showLive && data.tags.length > 0 && data.currentSub === 'live'}
+	{#if data.currentSub === 'live' && data.tags.length > 0}
 		<FilterPills tags={data.tags} currentTag={data.currentTag} baseHref="/video?sub=live" />
 	{/if}
 
@@ -97,7 +90,7 @@
 		<p class="text-center text-base-content/50 py-12">No videos found</p>
 	{:else}
 		<!-- Movies section -->
-		{#if showMovies && data.movies.length > 0}
+		{#if (!data.currentSub || data.currentSub === 'movie') && data.movies.length > 0}
 			{#if !data.currentSub}
 				<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">Movies</h3>
 			{/if}
@@ -105,7 +98,7 @@
 				{#each data.movies as movie}
 					<MediaCard
 						media={movie}
-						onPlay={() => playMovie(movie)}
+						onPlay={() => playMedia(movie)}
 						onQueue={() => addToQueue(movie)}
 						metaText={movie.genre_value ?? ''}
 					/>
@@ -114,7 +107,7 @@
 		{/if}
 
 		<!-- Live section -->
-		{#if showLive && data.liveItems.length > 0}
+		{#if (!data.currentSub || data.currentSub === 'live') && data.liveItems.length > 0}
 			{#if !data.currentSub}
 				<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">Live</h3>
 				<!-- All mode: show live in grid view -->
@@ -122,7 +115,7 @@
 					{#each data.liveItems as item}
 						<MediaCard
 							media={item}
-							onPlay={() => playLive(item)}
+							onPlay={() => playMedia(item)}
 							onQueue={() => addToQueue(item)}
 							metaText={item.meta?.event_name ?? ''}
 						/>
@@ -137,7 +130,7 @@
 					<ul class="list-none p-0">
 						{#each items as item}
 							<li class="flex items-center border-b border-base-300" class:bg-base-200={playerStore.state.mediaId === item.id} class:border-l-4={playerStore.state.mediaId === item.id} class:border-l-primary={playerStore.state.mediaId === item.id}>
-								<button class="flex items-center gap-4 flex-1 min-w-0 py-3 px-1 text-left cursor-pointer bg-transparent border-none active:scale-[0.98] transition-transform" onclick={() => playLive(item)}>
+								<button class="flex items-center gap-4 flex-1 min-w-0 py-3 px-1 text-left cursor-pointer bg-transparent border-none active:scale-[0.98] transition-transform" onclick={() => playMedia(item)}>
 									{#if item.thumbnail_path}
 										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="w-[120px] h-[68px] object-cover rounded-lg bg-base-300 flex-shrink-0" />
 									{:else}
