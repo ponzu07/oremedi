@@ -19,6 +19,9 @@
 
 	let editTitle = $state('');
 	let editCategory = $state('');
+	let editTags = $state<{ name: string; category: string }[]>([]);
+	let newTagName = $state('');
+	let newTagCategory = $state<string>('custom');
 
 	let filterCategory = $state<string>('all');
 	let searchQuery = $state('');
@@ -71,6 +74,15 @@
 		editingId = item.id;
 		editTitle = item.title;
 		editCategory = item.category;
+		editTags = item.tags ? [...item.tags] : [];
+	}
+
+	function addTag() {
+		const name = newTagName.trim();
+		if (!name) return;
+		if (editTags.some(t => t.name === name && t.category === newTagCategory)) return;
+		editTags = [...editTags, { name, category: newTagCategory }];
+		newTagName = '';
 	}
 
 	async function saveEdit(id: number) {
@@ -79,7 +91,8 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				title: editTitle,
-				category: editCategory
+				category: editCategory,
+				tags: editTags
 			})
 		});
 		editingId = null;
@@ -203,6 +216,38 @@
 								<option value="music">Music</option>
 							</select>
 						</label>
+						<div class="flex flex-col gap-1">
+							<span class="text-xs text-base-content/50">タグ</span>
+							<div class="flex flex-wrap gap-1 min-h-[32px]">
+								{#each editTags as tag, i}
+									<span class="badge badge-sm gap-1 {tag.category === 'artist' ? 'badge-primary' : tag.category === 'speaker' ? 'badge-secondary' : tag.category === 'genre' ? 'badge-accent' : 'badge-ghost'}">
+										{tag.name}
+										<button type="button" class="cursor-pointer" onclick={() => { editTags = editTags.filter((_, idx) => idx !== i); }}>✕</button>
+									</span>
+								{/each}
+							</div>
+							<div class="flex gap-1">
+								<select class="select select-sm w-24" bind:value={newTagCategory}>
+									<option value="artist">Artist</option>
+									<option value="speaker">Speaker</option>
+									<option value="genre">Genre</option>
+									<option value="custom">Custom</option>
+								</select>
+								<input
+									class="input input-sm flex-1"
+									placeholder="タグ名"
+									bind:value={newTagName}
+									list="tag-suggestions"
+									onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+								/>
+								<button type="button" class="btn btn-sm btn-ghost" onclick={addTag}>追加</button>
+							</div>
+							<datalist id="tag-suggestions">
+								{#each data.allTags.filter(t => t.category === newTagCategory) as t}
+									<option value={t.name} />
+								{/each}
+							</datalist>
+						</div>
 						<div class="flex gap-2 justify-end">
 							<button class="btn btn-ghost btn-sm" onclick={() => (editingId = null)}>キャンセル</button>
 							<button class="btn btn-primary btn-sm" onclick={() => saveEdit(item.id)}>保存</button>
@@ -225,6 +270,13 @@
 									{statusLabels[item.transcode_status] ?? item.transcode_status}
 								</span>
 							</div>
+							{#if item.tags?.length > 0}
+								<div class="flex flex-wrap gap-0.5 mt-0.5">
+									{#each item.tags as tag}
+										<span class="badge badge-xs {tag.category === 'artist' ? 'badge-primary' : tag.category === 'speaker' ? 'badge-secondary' : tag.category === 'genre' ? 'badge-accent' : 'badge-ghost'}">{tag.name}</span>
+									{/each}
+								</div>
+							{/if}
 						</div>
 						<div class="flex gap-1 flex-shrink-0">
 							{#if item.transcode_status === 'failed'}
