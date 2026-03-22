@@ -6,8 +6,7 @@
 	import { playerStore, type QueueItem, isVideoCategory } from '$lib/stores/player.svelte';
 	import {
 		downloadMedia,
-		getDownloadedMedia,
-		formatSize
+		getDownloadedMedia
 	} from '$lib/download-manager';
 	import { categoryLabels } from '$lib/constants';
 
