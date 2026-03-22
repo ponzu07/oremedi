@@ -43,6 +43,7 @@
 
 	// Video: sync videoSeekValue from store when not seeking
 	$effect(() => {
+		if (!isVideo) return;
 		if (!videoSeeking) {
 			videoSeekValue = playerStore.state.currentTime;
 		}
