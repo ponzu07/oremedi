@@ -10,8 +10,8 @@ services:
       - /volume1/docker/oremedi/media-originals:/media-originals
       - oremedi-data:/data
     environment:
-      - PASSWORD=oremedi
-      - JWT_SECRET=change_me_to_a_random_string
+      - PASSWORD=${PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
       - DATABASE_PATH=/data/oremedi.db
       - MEDIA_PATH=/media
       - ORIGINALS_PATH=/media-originals

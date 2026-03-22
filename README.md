@@ -24,13 +24,29 @@ mkdir -p /volume1/docker/oremedi/media
 mkdir -p /volume1/docker/oremedi/media-originals
 ```
 
-JWT用のシークレットキーを生成:
+### 2. .env ファイルを作成
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# JWT用のシークレットキーを生成
+JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+
+cat <<EOF > .env
+PASSWORD=oremedi
+JWT_SECRET=$JWT_SECRET
+EOF
 ```
 
-### 2. docker-compose.yml
+`PASSWORD`は適宜変更してください。
+
+### 3. docker-compose.yml
+
+`docker-compose.example.yml` をコピーして使えます:
+
+```bash
+cp docker-compose.example.yml docker-compose.yml
+```
+
+または手動で作成:
 
 ```yaml
 services:
@@ -43,8 +59,8 @@ services:
       - /volume1/docker/oremedi/media-originals:/media-originals
       - oremedi-data:/data
     environment:
-      - PASSWORD=your_password_here
-      - JWT_SECRET=your_generated_secret_here
+      - PASSWORD=${PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
       - DATABASE_PATH=/data/oremedi.db
       - MEDIA_PATH=/media
       - ORIGINALS_PATH=/media-originals
@@ -55,7 +71,7 @@ volumes:
   oremedi-data:
 ```
 
-### 3. 起動
+### 4. 起動
 
 ```bash
 docker compose up -d
