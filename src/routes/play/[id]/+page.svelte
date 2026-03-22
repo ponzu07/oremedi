@@ -14,7 +14,7 @@
 	let { data }: { data: PageData } = $props();
 	const media = data.media;
 
-	const isVideo = ['movie', 'live_video'].includes(media.category);
+	const isVideo = isVideoCategory(media.category);
 
 	let isDownloaded = $state(false);
 	let downloading = $state(false);

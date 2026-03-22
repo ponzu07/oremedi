@@ -55,9 +55,7 @@
 	}
 
 	const speedLabel = $derived(
-		ps.playbackRate % 1 === 0
-			? `${ps.playbackRate.toFixed(1)}x`
-			: `${ps.playbackRate % 1 === 0.5 ? ps.playbackRate.toFixed(1) : ps.playbackRate.toFixed(2).replace(/0$/, '')}x`
+		`${ps.playbackRate.toFixed(ps.playbackRate % 1 === 0 ? 1 : 2)}x`
 	);
 </script>
 

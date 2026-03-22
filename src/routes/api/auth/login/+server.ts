@@ -6,7 +6,7 @@ import { config } from '$lib/server/config';
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	const { password } = await request.json();
 
-	if (!password || !config.password) {
+	if (!password) {
 		return json({ error: 'Invalid request' }, { status: 400 });
 	}
 

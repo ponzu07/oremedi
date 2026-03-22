@@ -28,7 +28,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	const body = await request.json();
 	const { title, category, duration, metadata, tags } = body;
 
-	const existing = db.prepare('SELECT * FROM media WHERE id = ?').get(params.id);
+	const existing = db.prepare('SELECT id FROM media WHERE id = ?').get(params.id);
 	if (!existing) {
 		return json({ error: 'Not found' }, { status: 404 });
 	}
@@ -86,7 +86,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
 export const DELETE: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const existing = db.prepare('SELECT * FROM media WHERE id = ?').get(params.id);
+	const existing = db.prepare('SELECT id FROM media WHERE id = ?').get(params.id);
 
 	if (!existing) {
 		return json({ error: 'Not found' }, { status: 404 });

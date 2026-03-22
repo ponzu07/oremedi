@@ -6,8 +6,6 @@
 
 	// Initialize Cast SDK
 	$effect(() => {
-		if (typeof window === 'undefined') return;
-
 		const initCast = () => {
 			const cast = (window as any).cast;
 			const chrome = (window as any).chrome;
