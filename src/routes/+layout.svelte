@@ -1,11 +1,14 @@
 <script lang="ts">
 	import '../app.css';
+	import { pwaInfo } from 'virtual:pwa-info';
 	import { page } from '$app/state';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import MiniPlayer from '$lib/components/MiniPlayer.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import { playerStore, isVideoCategory } from '$lib/stores/player.svelte';
 	import { onMount } from 'svelte';
+
+	const webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
 	let { children } = $props();
 
@@ -33,6 +36,10 @@
 		document.documentElement.style.setProperty('--bottom-offset', offset);
 	});
 </script>
+
+<svelte:head>
+	{@html webManifestLink}
+</svelte:head>
 
 <audio bind:this={audioEl} hidden></audio>
 
