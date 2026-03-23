@@ -1,5 +1,6 @@
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
+import { assertSafePath } from '$lib/server/config';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,6 +13,10 @@ export const GET: RequestHandler = async ({ params, request }) => {
 	}
 
 	const filePath = media.original_path;
+
+	try { assertSafePath(filePath); } catch {
+		return new Response('Forbidden', { status: 403 });
+	}
 
 	if (!fs.existsSync(filePath)) {
 		return new Response('File not found', { status: 404 });

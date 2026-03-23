@@ -25,7 +25,10 @@ export const GET: RequestHandler = async ({ params }) => {
 
 export const PUT: RequestHandler = async ({ params, request }) => {
 	const db = getDb();
-	const body = await request.json();
+	let body: Record<string, unknown>;
+	try { body = await request.json(); } catch {
+		return json({ error: 'Invalid request body' }, { status: 400 });
+	}
 	const { title, category, duration, metadata, tags } = body;
 
 	const existing = db.prepare('SELECT id FROM media WHERE id = ?').get(params.id);

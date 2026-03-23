@@ -15,14 +15,23 @@ export const load: PageServerLoad = async ({ url }) => {
 		ORDER BY m.title
 	`).all(`%${q}%`, `%${q}%`) as { id: number; title: string; category: string; duration: number | null; thumbnail_path: string | null }[];
 
-	const tagQuery = db.prepare(`
-		SELECT t.name, t.category FROM tags t
-		JOIN media_tags mt ON t.id = mt.tag_id
-		WHERE mt.media_id = ?
-	`);
+	const resultIds = results.map((r) => r.id);
+	const tagsMap = new Map<number, { name: string; category: string }[]>();
+	if (resultIds.length > 0) {
+		const placeholders = resultIds.map(() => '?').join(',');
+		const allTags = db.prepare(`
+			SELECT mt.media_id, t.name, t.category FROM tags t
+			JOIN media_tags mt ON t.id = mt.tag_id
+			WHERE mt.media_id IN (${placeholders})
+		`).all(...resultIds) as { media_id: number; name: string; category: string }[];
+		for (const t of allTags) {
+			if (!tagsMap.has(t.media_id)) tagsMap.set(t.media_id, []);
+			tagsMap.get(t.media_id)!.push({ name: t.name, category: t.category });
+		}
+	}
 	const resultsWithTags = results.map(r => ({
 		...r,
-		tags: tagQuery.all(r.id) as { name: string; category: string }[]
+		tags: tagsMap.get(r.id) ?? []
 	}));
 
 	return { query: q, results: resultsWithTags };

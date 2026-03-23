@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import type Database from 'better-sqlite3';
 
 interface FfprobeChapter {
@@ -15,10 +15,9 @@ export interface Chapter {
 
 export function extractChapters(filePath: string): Chapter[] {
 	try {
-		const result = execSync(
-			`ffprobe -v error -show_chapters -of json "${filePath}"`,
-			{ stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
-		);
+		const result = execFileSync('ffprobe', [
+			'-v', 'error', '-show_chapters', '-of', 'json', filePath
+		], { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' });
 		const data = JSON.parse(result);
 		if (!data.chapters || data.chapters.length === 0) return [];
 

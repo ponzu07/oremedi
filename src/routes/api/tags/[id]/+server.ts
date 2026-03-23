@@ -4,7 +4,10 @@ import { getDb } from '$lib/server/database';
 
 export const PUT: RequestHandler = async ({ params, request }) => {
 	const db = getDb();
-	const body = await request.json();
+	let body: { name?: string; category?: string };
+	try { body = await request.json(); } catch {
+		return json({ error: 'Invalid request body' }, { status: 400 });
+	}
 	const { name, category } = body;
 
 	const existing = db.prepare('SELECT id FROM tags WHERE id = ?').get(params.id);

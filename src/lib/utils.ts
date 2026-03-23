@@ -25,8 +25,8 @@ export function addToQueue(item: {
 	toast.show(`"${item.title}" をキューに追加`);
 }
 
-export function logout() {
-	document.cookie = 'auth_token=; Max-Age=0; path=/';
+export async function logout() {
+	await fetch('/api/auth/logout', { method: 'POST' });
 	window.location.href = '/login';
 }
 

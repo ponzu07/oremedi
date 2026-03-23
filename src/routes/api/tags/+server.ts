@@ -22,7 +22,11 @@ export const GET: RequestHandler = async ({ url }) => {
 
 export const PUT: RequestHandler = async ({ request }) => {
 	const db = getDb();
-	const { oldCategory, newCategory } = await request.json();
+	let body: { oldCategory?: string; newCategory?: string };
+	try { body = await request.json(); } catch {
+		return json({ error: 'Invalid request body' }, { status: 400 });
+	}
+	const { oldCategory, newCategory } = body;
 
 	if (!oldCategory || !newCategory) {
 		return json({ error: 'oldCategory and newCategory required' }, { status: 400 });
@@ -34,7 +38,11 @@ export const PUT: RequestHandler = async ({ request }) => {
 
 export const DELETE: RequestHandler = async ({ request }) => {
 	const db = getDb();
-	const { category } = await request.json();
+	let body: { category?: string };
+	try { body = await request.json(); } catch {
+		return json({ error: 'Invalid request body' }, { status: 400 });
+	}
+	const { category } = body;
 
 	if (!category) {
 		return json({ error: 'category required' }, { status: 400 });

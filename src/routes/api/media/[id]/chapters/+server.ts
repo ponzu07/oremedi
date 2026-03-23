@@ -18,7 +18,10 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		return json({ error: 'Not found' }, { status: 404 });
 	}
 
-	const chapters: Chapter[] = await request.json();
+	let chapters: Chapter[];
+	try { chapters = await request.json(); } catch {
+		return json({ error: 'Invalid request body' }, { status: 400 });
+	}
 	saveChapters(db, mediaId, chapters);
 
 	return json({ success: true, chapters: getChapters(db, mediaId) });

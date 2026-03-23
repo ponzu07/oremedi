@@ -1,4 +1,4 @@
-import { spawn, execSync } from 'child_process';
+import { spawn, execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import type Database from 'better-sqlite3';
@@ -32,24 +32,21 @@ type HwAccel = 'vaapi' | 'none';
 
 function probeCodecs(filePath: string): ProbeResult {
 	try {
-		const result = execSync(
-			`ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-			{ stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
-		);
-		const videoCodec = result.trim().toLowerCase() || null;
-
-		const audioResult = execSync(
-			`ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-			{ stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
-		);
-		const audioCodec = audioResult.trim().toLowerCase() || null;
-
+		const result = execFileSync('ffprobe', [
+			'-v', 'error', '-show_entries', 'stream=codec_name,codec_type',
+			'-of', 'json', filePath
+		], { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' });
+		const data = JSON.parse(result);
+		const streams = data.streams || [];
+		const videoStream = streams.find((s: { codec_type: string }) => s.codec_type === 'video');
+		const audioStream = streams.find((s: { codec_type: string }) => s.codec_type === 'audio');
 		return {
-			video_codec: videoCodec,
-			audio_codec: audioCodec,
+			video_codec: videoStream?.codec_name?.toLowerCase() || null,
+			audio_codec: audioStream?.codec_name?.toLowerCase() || null,
 			container: path.extname(filePath).toLowerCase()
 		};
-	} catch {
+	} catch (e) {
+		console.warn(`[transcoder] ffprobe failed for "${filePath}":`, (e as Error).message);
 		return { video_codec: null, audio_codec: null, container: path.extname(filePath).toLowerCase() };
 	}
 }
@@ -71,7 +68,12 @@ function decideAction(probe: ProbeResult): TranscodeAction {
 function detectHwAccel(): HwAccel {
 	if (fs.existsSync('/dev/dri/renderD128')) {
 		try {
-			execSync('ffmpeg -init_hw_device vaapi=va:/dev/dri/renderD128 -f lavfi -i nullsrc -t 0.1 -vf "format=nv12,hwupload" -c:v h264_vaapi -f null - 2>&1', { stdio: 'pipe' });
+			execFileSync('ffmpeg', [
+				'-init_hw_device', 'vaapi=va:/dev/dri/renderD128',
+				'-f', 'lavfi', '-i', 'nullsrc', '-t', '0.1',
+				'-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi',
+				'-f', 'null', '-'
+			], { stdio: 'pipe' });
 			return 'vaapi';
 		} catch {}
 	}
@@ -80,13 +82,14 @@ function detectHwAccel(): HwAccel {
 
 function getDuration(filePath: string): number | null {
 	try {
-		const result = execSync(
-			`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-			{ stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
-		);
+		const result = execFileSync('ffprobe', [
+			'-v', 'error', '-show_entries', 'format=duration',
+			'-of', 'default=noprint_wrappers=1:nokey=1', filePath
+		], { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' });
 		const duration = parseFloat(result.trim());
 		return isNaN(duration) ? null : duration;
-	} catch {
+	} catch (e) {
+		console.warn(`[transcoder] getDuration failed for "${filePath}":`, (e as Error).message);
 		return null;
 	}
 }

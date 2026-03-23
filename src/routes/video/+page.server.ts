@@ -73,22 +73,37 @@ export const load: PageServerLoad = async ({ url }) => {
 			ORDER BY t.name
 		`).all() as { name: string; category: string }[];
 
-		// Attach tags and metadata to each item
-		liveItems = items.map((item) => {
-			const itemTags = db.prepare(`
-				SELECT t.name, t.category FROM tags t
+		// Batch fetch tags and metadata for all live items
+		const itemIds = items.map((i) => i.id);
+		const tagsMap = new Map<number, { name: string; category: string }[]>();
+		const metaMap = new Map<number, Record<string, string>>();
+
+		if (itemIds.length > 0) {
+			const placeholders = itemIds.map(() => '?').join(',');
+			const allTags = db.prepare(`
+				SELECT mt.media_id, t.name, t.category FROM tags t
 				JOIN media_tags mt ON t.id = mt.tag_id
-				WHERE mt.media_id = ?
-			`).all(item.id) as { name: string; category: string }[];
+				WHERE mt.media_id IN (${placeholders})
+			`).all(...itemIds) as { media_id: number; name: string; category: string }[];
+			for (const t of allTags) {
+				if (!tagsMap.has(t.media_id)) tagsMap.set(t.media_id, []);
+				tagsMap.get(t.media_id)!.push({ name: t.name, category: t.category });
+			}
 
-			const meta = db.prepare(
-				'SELECT key, value FROM media_metadata WHERE media_id = ?'
-			).all(item.id) as { key: string; value: string }[];
-			const metaObj: Record<string, string> = {};
-			for (const m of meta) metaObj[m.key] = m.value;
+			const allMeta = db.prepare(
+				`SELECT media_id, key, value FROM media_metadata WHERE media_id IN (${placeholders})`
+			).all(...itemIds) as { media_id: number; key: string; value: string }[];
+			for (const m of allMeta) {
+				if (!metaMap.has(m.media_id)) metaMap.set(m.media_id, {});
+				metaMap.get(m.media_id)![m.key] = m.value;
+			}
+		}
 
-			return { ...item, tags: itemTags, meta: metaObj };
-		});
+		liveItems = items.map((item) => ({
+			...item,
+			tags: tagsMap.get(item.id) ?? [],
+			meta: metaMap.get(item.id) ?? {}
+		}));
 	}
 
 	return {

@@ -42,7 +42,10 @@ export const GET: RequestHandler = async ({ url }) => {
 
 export const POST: RequestHandler = async ({ request }) => {
 	const db = getDb();
-	const body = await request.json();
+	let body: Record<string, unknown>;
+	try { body = await request.json(); } catch {
+		return json({ error: 'Invalid request body' }, { status: 400 });
+	}
 
 	const { title, category, original_path, duration, metadata, tags } = body;
 

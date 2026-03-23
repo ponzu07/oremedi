@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/database';
-import { config } from '$lib/server/config';
+import { config, assertSafePath } from '$lib/server/config';
 import fs from 'fs';
 import path from 'path';
 
@@ -19,8 +19,19 @@ export const GET: RequestHandler = async ({ params }) => {
 		return new Response('No thumbnail', { status: 404 });
 	}
 
-	const data = fs.readFileSync(media.thumbnail_path);
-	return new Response(data, {
+	try { assertSafePath(media.thumbnail_path); } catch {
+		return new Response('Forbidden', { status: 403 });
+	}
+
+	const stream = fs.createReadStream(media.thumbnail_path);
+	const webStream = new ReadableStream({
+		start(controller) {
+			stream.on('data', (chunk) => controller.enqueue(chunk));
+			stream.on('end', () => controller.close());
+			stream.on('error', (err) => controller.error(err));
+		}
+	});
+	return new Response(webStream, {
 		headers: {
 			'Content-Type': 'image/jpeg',
 			'Cache-Control': 'public, max-age=86400'

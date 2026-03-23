@@ -15,7 +15,11 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 		);
 	}
 
-	const { password } = await request.json();
+	let body: { password?: string };
+	try { body = await request.json(); } catch {
+		return json({ error: 'Invalid request body' }, { status: 400 });
+	}
+	const { password } = body;
 
 	if (!password) {
 		return json({ error: 'Invalid request' }, { status: 400 });

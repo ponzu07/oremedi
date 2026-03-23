@@ -1,5 +1,6 @@
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
+import { assertSafePath } from '$lib/server/config';
 import fs from 'fs';
 import path from 'path';
 
@@ -9,6 +10,10 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	if (!media) {
 		return new Response('Not found', { status: 404 });
+	}
+
+	try { assertSafePath(media.original_path); } catch {
+		return new Response('Forbidden', { status: 403 });
 	}
 
 	if (!fs.existsSync(media.original_path)) {
