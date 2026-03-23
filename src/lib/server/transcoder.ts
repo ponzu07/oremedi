@@ -1,9 +1,38 @@
-import { spawn, execFileSync } from 'child_process';
+import { spawn, execFileSync, type ChildProcess } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import type Database from 'better-sqlite3';
 import { computeFileHash } from '$lib/server/file-hash';
 import { extractChapters, saveChapters } from '$lib/server/chapters';
+
+let currentMediaId: number | null = null;
+let currentProcess: ChildProcess | null = null;
+
+export function cancelTranscode(db: Database.Database, mediaId: number): boolean {
+	const media = db.prepare(
+		"SELECT id, transcode_status FROM media WHERE id = ?"
+	).get(mediaId) as { id: number; transcode_status: string } | undefined;
+	if (!media) return false;
+
+	if (media.transcode_status === 'pending') {
+		db.prepare(
+			"UPDATE media SET transcode_status = 'skipped', transcode_progress = 0, updated_at = datetime('now') WHERE id = ?"
+		).run(mediaId);
+		return true;
+	}
+
+	if (media.transcode_status === 'processing' && currentMediaId === mediaId && currentProcess) {
+		currentProcess.kill('SIGTERM');
+		// onClose handler in runFfmpeg will fire with non-zero code;
+		// we mark as skipped here before that happens
+		db.prepare(
+			"UPDATE media SET transcode_status = 'skipped', transcode_progress = 0, updated_at = datetime('now') WHERE id = ?"
+		).run(mediaId);
+		return true;
+	}
+
+	return false;
+}
 
 const AUDIO_ONLY = new Set(['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.wma']);
 const BROWSER_COMPATIBLE_AUDIO = new Set(['.mp3', '.aac', '.ogg', '.m4a']);
@@ -135,6 +164,8 @@ function runFfmpeg(
 	onClose: (code: number | null) => void
 ) {
 	const ffmpeg = spawn('ffmpeg', args);
+	currentMediaId = mediaId;
+	currentProcess = ffmpeg;
 	let lastProgress = 0;
 
 	if (totalDuration && totalDuration > 0) {
@@ -152,8 +183,20 @@ function runFfmpeg(
 		});
 	}
 
-	ffmpeg.on('close', onClose);
-	ffmpeg.on('error', () => onClose(-1));
+	ffmpeg.on('close', (code) => {
+		if (currentMediaId === mediaId) {
+			currentMediaId = null;
+			currentProcess = null;
+		}
+		onClose(code);
+	});
+	ffmpeg.on('error', () => {
+		if (currentMediaId === mediaId) {
+			currentMediaId = null;
+			currentProcess = null;
+		}
+		onClose(-1);
+	});
 }
 
 function finishMedia(
@@ -182,6 +225,11 @@ function finishMedia(
 	).run(outputPath, thumbPath, duration ? Math.round(duration) : null, newHash, mediaId);
 
 	callback();
+}
+
+function isCancelled(db: Database.Database, mediaId: number): boolean {
+	const row = db.prepare("SELECT transcode_status FROM media WHERE id = ?").get(mediaId) as { transcode_status: string } | undefined;
+	return row?.transcode_status === 'skipped';
 }
 
 export function startTranscodeWorker(db: Database.Database, mediaPath: string, originalsPath: string) {
@@ -223,10 +271,13 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 							console.log(`[transcoder] Done (audio): "${next.title}"`);
 							setTimeout(processNext, 1000);
 						});
-					} else {
+					} else if (!isCancelled(db, next.id)) {
 						db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 						console.error(`[transcoder] Failed (audio): "${next.title}"`);
 						setTimeout(processNext, 5000);
+					} else {
+						console.log(`[transcoder] Cancelled (audio): "${next.title}"`);
+						setTimeout(processNext, 1000);
 					}
 				});
 			}
@@ -315,16 +366,22 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 								done();
 							});
 						});
-					} else {
+					} else if (!isCancelled(db, next.id)) {
 						db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 						console.error(`[transcoder] Failed: "${next.title}"`);
 						setTimeout(done, 4000);
+					} else {
+						console.log(`[transcoder] Cancelled: "${next.title}"`);
+						setTimeout(done, 1000);
 					}
 				});
-			} else {
+			} else if (!isCancelled(db, next.id)) {
 				db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 				console.error(`[transcoder] Failed: "${next.title}"`);
 				setTimeout(done, 4000);
+			} else {
+				console.log(`[transcoder] Cancelled: "${next.title}"`);
+				setTimeout(done, 1000);
 			}
 		});
 	}

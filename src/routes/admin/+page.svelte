@@ -78,6 +78,11 @@
 		}
 	}
 
+	async function cancelTranscode(id: number) {
+		await fetch(`/api/media/${id}/cancel-transcode`, { method: 'POST' });
+		transcodeQueue = transcodeQueue.filter(q => q.id !== id);
+	}
+
 	$effect(() => {
 		if (transcodeQueue.length > 0 && !transcodePolling) {
 			pollTranscodeStatus();
@@ -407,6 +412,9 @@
 								{statusLabels[item.transcode_status] ?? item.transcode_status}
 							{/if}
 						</span>
+						<button class="btn btn-ghost btn-xs btn-circle ml-1 text-error" onclick={() => cancelTranscode(item.id)} title="キャンセル">
+							<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+						</button>
 					</div>
 					{#if item.transcode_status === 'processing'}
 						<progress class="progress progress-primary w-full h-1.5" value={item.transcode_progress} max="100"></progress>

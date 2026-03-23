@@ -33,6 +33,8 @@
 	let resumeTime = $state<number | null>(null);
 	let resumeSaveInterval: ReturnType<typeof setInterval> | null = null;
 	let isPip = $state(false);
+	let showChapterPanel = $state(false);
+	const hasChapters = data.chapters.length > 0;
 
 	// Sync seekValue from store when not seeking (audio)
 	$effect(() => {
@@ -385,6 +387,19 @@
 					</svg>
 				</button>
 
+				{#if hasChapters}
+					<button class="vp-btn" class:vp-active={showChapterPanel} onclick={(e) => { e.stopPropagation(); showChapterPanel = !showChapterPanel; showControls(); }} aria-label="Chapters">
+						<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<line x1="8" y1="6" x2="21" y2="6" />
+							<line x1="8" y1="12" x2="21" y2="12" />
+							<line x1="8" y1="18" x2="21" y2="18" />
+							<line x1="3" y1="6" x2="3.01" y2="6" />
+							<line x1="3" y1="12" x2="3.01" y2="12" />
+							<line x1="3" y1="18" x2="3.01" y2="18" />
+						</svg>
+					</button>
+				{/if}
+
 				{#if pipSupported}
 					<button class="vp-btn" class:vp-active={isPip} onclick={togglePip} aria-label="Picture in Picture">
 						<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -468,6 +483,34 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Chapter panel overlay -->
+	{#if showChapterPanel && hasChapters}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div class="vp-chapter-drawer" onclick={(e) => e.stopPropagation()}>
+			<div class="vp-chapter-drawer-header">
+				<span class="vp-chapter-drawer-title">Chapters</span>
+				<button class="vp-btn" onclick={() => { showChapterPanel = false; }} aria-label="Close">
+					<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+						<line x1="18" y1="6" x2="6" y2="18" />
+						<line x1="6" y1="6" x2="18" y2="18" />
+					</svg>
+				</button>
+			</div>
+			<div class="vp-chapter-drawer-list">
+				{#each data.chapters as chapter}
+					<button
+						class="vp-chapter-drawer-item"
+						class:vp-chapter-active={playerStore.state.currentTime >= chapter.start_time && playerStore.state.currentTime < chapter.end_time}
+						onclick={() => { playerStore.seek(chapter.start_time); showChapterPanel = false; scheduleHideControls(); }}
+					>
+						<span class="vp-chapter-time">{formatTime(chapter.start_time)}</span>
+						<span class="vp-chapter-name">{chapter.title}</span>
+					</button>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<!-- Resume overlay -->
 	{#if resumeTime}
@@ -1059,6 +1102,71 @@
 	}
 
 	/* Resume overlay */
+	/* Chapter drawer */
+	.vp-chapter-drawer {
+		position: absolute;
+		right: 0;
+		bottom: 0;
+		width: 280px;
+		max-height: 70%;
+		background: rgba(0, 0, 0, 0.85);
+		backdrop-filter: blur(8px);
+		border-radius: 8px 0 0 0;
+		display: flex;
+		flex-direction: column;
+		z-index: 10;
+		overflow: hidden;
+	}
+
+	.vp-chapter-drawer-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.5rem 0.75rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+	}
+
+	.vp-chapter-drawer-title {
+		color: white;
+		font-size: 0.85rem;
+		font-weight: 600;
+	}
+
+	.vp-chapter-drawer-list {
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+		padding: 0.25rem 0;
+	}
+
+	.vp-chapter-drawer-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: none;
+		border: none;
+		border-left: 3px solid transparent;
+		color: rgba(255, 255, 255, 0.8);
+		cursor: pointer;
+		text-align: left;
+		width: 100%;
+		font-size: 0.8rem;
+	}
+
+	.vp-chapter-drawer-item:active {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.vp-chapter-drawer-item.vp-chapter-active {
+		border-left-color: var(--color-primary);
+		color: white;
+	}
+
+	.vp-chapter-drawer-item.vp-chapter-active .vp-chapter-name {
+		color: var(--color-primary);
+		font-weight: 600;
+	}
+
 	.vp-resume {
 		position: absolute;
 		bottom: 80px;
