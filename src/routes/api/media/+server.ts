@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
+import { assertSafePath } from '$lib/server/config';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const db = getDb();
@@ -51,6 +52,10 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	if (!title || !category || !original_path) {
 		return json({ error: 'title, category, and original_path are required' }, { status: 400 });
+	}
+
+	try { assertSafePath(String(original_path)); } catch {
+		return json({ error: 'Invalid path' }, { status: 403 });
 	}
 
 	const result = db.prepare(`

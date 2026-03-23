@@ -243,7 +243,7 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 
 		if (action === 'skip') {
 			// Already browser-compatible container + codecs
-			generateThumbnail(next.original_path, thumbPath, () => {
+			generateThumbnail(next.original_path, thumbPath, totalDuration, () => {
 				const chapters = extractChapters(next.original_path);
 				if (chapters.length > 0) saveChapters(db, next.id, chapters);
 				db.prepare(
@@ -261,7 +261,7 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 			const args = ['-i', next.original_path, '-c', 'copy', '-movflags', '+faststart', '-y', outputPath];
 			runFfmpeg(args, db, next.id, totalDuration, (code) => {
 				if (code === 0) {
-					generateThumbnail(next.original_path, thumbPath, () => {
+					generateThumbnail(next.original_path, thumbPath, totalDuration, () => {
 						finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
 							console.log(`[transcoder] Remuxed: "${next.title}"`);
 							setTimeout(processNext, 1000);
@@ -297,7 +297,7 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 
 		runFfmpeg(args, db, next.id, totalDuration, (code) => {
 			if (code === 0) {
-				generateThumbnail(next.original_path, thumbPath, () => {
+				generateThumbnail(next.original_path, thumbPath, totalDuration, () => {
 					finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
 						console.log(`[transcoder] Transcoded: "${next.title}"`);
 						done();
@@ -309,7 +309,7 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 				db.prepare("UPDATE media SET transcode_progress = 0 WHERE id = ?").run(next.id);
 				runFfmpeg(swArgs, db, next.id, totalDuration, (swCode) => {
 					if (swCode === 0) {
-						generateThumbnail(next.original_path, thumbPath, () => {
+						generateThumbnail(next.original_path, thumbPath, totalDuration, () => {
 							finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
 								console.log(`[transcoder] Transcoded (software fallback): "${next.title}"`);
 								done();
@@ -332,10 +332,11 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 	setTimeout(processNext, 2000);
 }
 
-function generateThumbnail(inputPath: string, outputPath: string, callback: () => void) {
+function generateThumbnail(inputPath: string, outputPath: string, duration: number | null, callback: () => void) {
+	const seekTo = duration && duration > 0 ? Math.min(30, Math.floor(duration * 0.1)) : 3;
 	const ffmpeg = spawn('ffmpeg', [
+		'-ss', String(seekTo),
 		'-i', inputPath,
-		'-ss', '00:00:30',
 		'-vframes', '1',
 		'-vf', 'scale=480:-1',
 		'-y', outputPath

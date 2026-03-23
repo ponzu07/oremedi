@@ -48,7 +48,7 @@
 						onQueue={() => addToQueue(item)}
 						metaText="{formatDuration(item.duration)}{item.tags?.length > 0 ? ` — ${(item.tags as { name: string; category: string }[]).map((t) => t.name).join(', ')}` : ''}"
 						thumbnailShape="circle"
-						placeholderText={(((item.tags as { name: string; category: string }[])?.find((t) => t.category === 'speaker')?.name ?? '?')[0]).toUpperCase()}
+						placeholderText={((item.tags as { name: string; category: string }[])?.find((t) => t.category === 'speaker')?.name || '?')[0].toUpperCase()}
 					/>
 				{/each}
 			</ul>

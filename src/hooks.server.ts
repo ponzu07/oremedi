@@ -29,9 +29,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
-	// Signed URL token for Chromecast
+	// Signed URL token for Chromecast (stream/thumbnail only)
 	const urlToken = event.url.searchParams.get('token');
-	if (urlToken && pathname.startsWith('/api/media/')) {
+	if (urlToken && /^\/api\/media\/\d+\/(stream|thumbnail)$/.test(pathname)) {
 		const payload = verifyToken(urlToken, config.jwtSecret);
 		if (payload) {
 			return resolve(event);

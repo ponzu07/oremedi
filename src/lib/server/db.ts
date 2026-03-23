@@ -6,39 +6,39 @@ export function createDatabase(dbPath: string): Database.Database {
 	db.pragma('journal_mode = WAL');
 	db.pragma('foreign_keys = ON');
 
-	// Migrate: remove CHECK constraint from tags.category if it exists
-	const tagsTableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tags'").get() as { sql: string } | undefined;
-	if (tagsTableInfo?.sql?.includes('CHECK')) {
-		db.exec(`
-			ALTER TABLE tags RENAME TO tags_old;
-			CREATE TABLE tags (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				name TEXT NOT NULL,
-				category TEXT NOT NULL,
-				UNIQUE(name, category)
-			);
-			INSERT INTO tags SELECT * FROM tags_old;
-			DROP TABLE tags_old;
-		`);
-	}
+	// Migrations
+	const migrate = db.transaction(() => {
+		// Remove CHECK constraint from tags.category if it exists
+		const tagsTableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tags'").get() as { sql: string } | undefined;
+		if (tagsTableInfo?.sql?.includes('CHECK')) {
+			db.exec(`
+				ALTER TABLE tags RENAME TO tags_old;
+				CREATE TABLE tags (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					name TEXT NOT NULL,
+					category TEXT NOT NULL,
+					UNIQUE(name, category)
+				);
+				INSERT INTO tags SELECT * FROM tags_old;
+				DROP TABLE tags_old;
+			`);
+		}
 
-	// Migrate: drop converted_path column from media if it exists
-	const mediaColumns = db.prepare("PRAGMA table_info('media')").all() as { name: string }[];
-	if (mediaColumns.some(c => c.name === 'converted_path')) {
-		db.exec("ALTER TABLE media DROP COLUMN converted_path");
-	}
+		// Media column migrations
+		const mediaColumns = db.prepare("PRAGMA table_info('media')").all() as { name: string }[];
+		const colNames = new Set(mediaColumns.map(c => c.name));
 
-	// Migrate: add transcode_progress column if not exists
-	const mediaColsForProgress = db.prepare("PRAGMA table_info('media')").all() as { name: string }[];
-	if (mediaColsForProgress.length > 0 && !mediaColsForProgress.some(c => c.name === 'transcode_progress')) {
-		db.exec("ALTER TABLE media ADD COLUMN transcode_progress INTEGER NOT NULL DEFAULT 0");
-	}
-
-	// Migrate: add file_hash column if not exists
-	const mediaColsForHash = db.prepare("PRAGMA table_info('media')").all() as { name: string }[];
-	if (mediaColsForHash.length > 0 && !mediaColsForHash.some(c => c.name === 'file_hash')) {
-		db.exec("ALTER TABLE media ADD COLUMN file_hash TEXT");
-	}
+		if (colNames.has('converted_path')) {
+			db.exec("ALTER TABLE media DROP COLUMN converted_path");
+		}
+		if (mediaColumns.length > 0 && !colNames.has('transcode_progress')) {
+			db.exec("ALTER TABLE media ADD COLUMN transcode_progress INTEGER NOT NULL DEFAULT 0");
+		}
+		if (mediaColumns.length > 0 && !colNames.has('file_hash')) {
+			db.exec("ALTER TABLE media ADD COLUMN file_hash TEXT");
+		}
+	});
+	migrate();
 
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS media (

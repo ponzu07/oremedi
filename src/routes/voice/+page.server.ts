@@ -32,14 +32,24 @@ export const load: PageServerLoad = async ({ url }) => {
 		ORDER BY t.name
 	`).all() as { name: string; category: string }[];
 
-	const voiceItems: VoiceItem[] = items.map((item) => {
-		const itemTags = db.prepare(`
-			SELECT t.name, t.category FROM tags t
+	const itemIds = items.map((i) => i.id);
+	const tagsMap = new Map<number, { name: string; category: string }[]>();
+	if (itemIds.length > 0) {
+		const placeholders = itemIds.map(() => '?').join(',');
+		const allTags = db.prepare(`
+			SELECT mt.media_id, t.name, t.category FROM tags t
 			JOIN media_tags mt ON t.id = mt.tag_id
-			WHERE mt.media_id = ?
-		`).all(item.id) as { name: string; category: string }[];
-		return { ...item, tags: itemTags };
-	});
+			WHERE mt.media_id IN (${placeholders})
+		`).all(...itemIds) as { media_id: number; name: string; category: string }[];
+		for (const t of allTags) {
+			if (!tagsMap.has(t.media_id)) tagsMap.set(t.media_id, []);
+			tagsMap.get(t.media_id)!.push({ name: t.name, category: t.category });
+		}
+	}
+	const voiceItems: VoiceItem[] = items.map((item) => ({
+		...item,
+		tags: tagsMap.get(item.id) ?? []
+	}));
 
 	return {
 		items: voiceItems,
