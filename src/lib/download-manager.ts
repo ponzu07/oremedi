@@ -74,7 +74,7 @@ export async function downloadMedia(
 	category: string,
 	onProgress?: (loaded: number, total: number) => void
 ): Promise<void> {
-	const response = await fetch(`/api/media/${mediaId}/download`);
+	const response = await fetch(`/api/media/${mediaId}/stream`);
 	if (!response.ok) throw new Error('Download failed');
 
 	const contentLength = Number(response.headers.get('content-length'));
