@@ -2,7 +2,7 @@ const DB_NAME = 'oremedi-downloads';
 const DB_VERSION = 2;
 const META_STORE = 'media';
 const CHUNK_STORE = 'chunks';
-const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB per chunk
+const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk
 
 interface DownloadMeta {
 	id: number;
@@ -31,15 +31,12 @@ function openDB(): Promise<IDBDatabase> {
 
 		request.onupgradeneeded = () => {
 			const db = request.result;
-			// v1 -> v2: migrate from blob-in-meta to chunked storage
 			if (!db.objectStoreNames.contains(META_STORE)) {
 				db.createObjectStore(META_STORE, { keyPath: 'id' });
 			}
 			if (!db.objectStoreNames.contains(CHUNK_STORE)) {
 				db.createObjectStore(CHUNK_STORE);
 			}
-			// Clean up old blob entries (v1 had blob field in meta store)
-			// They'll be overwritten on next download
 		};
 
 		request.onsuccess = () => resolve(request.result);
@@ -62,7 +59,7 @@ export async function getStorageEstimate(): Promise<{ usage: number; quota: numb
 	return { usage: 0, quota: 0 };
 }
 
-function putChunk(db: IDBDatabase, key: string, data: Uint8Array): Promise<void> {
+function putChunk(db: IDBDatabase, key: string, data: Blob): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const tx = db.transaction(CHUNK_STORE, 'readwrite');
 		tx.objectStore(CHUNK_STORE).put(data, key);
@@ -87,36 +84,38 @@ export async function downloadMedia(
 
 	const db = await openDB();
 
-	// Stream chunks to IndexedDB incrementally
+	// Stream to IndexedDB in chunks — no large buffer accumulation
 	let loaded = 0;
 	let chunkIndex = 0;
-	let buffer = new Uint8Array(0);
+	let pending: BlobPart[] = [];
+	let pendingSize = 0;
 
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
 
-		// Append to buffer
-		const newBuffer = new Uint8Array(buffer.length + value.length);
-		newBuffer.set(buffer);
-		newBuffer.set(value, buffer.length);
-		buffer = newBuffer;
+		pending.push(value);
+		pendingSize += value.length;
 		loaded += value.length;
 		onProgress?.(loaded, contentLength);
 
-		// Flush full chunks to IndexedDB
-		while (buffer.length >= CHUNK_SIZE) {
-			await putChunk(db, `${mediaId}_${chunkIndex}`, buffer.slice(0, CHUNK_SIZE));
-			buffer = buffer.slice(CHUNK_SIZE);
+		// Flush when accumulated enough
+		if (pendingSize >= CHUNK_SIZE) {
+			const blob = new Blob(pending, { type: 'application/octet-stream' });
+			await putChunk(db, `${mediaId}_${chunkIndex}`, blob);
+			pending = [];
+			pendingSize = 0;
 			chunkIndex++;
 		}
 	}
 
-	// Write remaining buffer
-	if (buffer.length > 0) {
-		await putChunk(db, `${mediaId}_${chunkIndex}`, buffer);
+	// Write remaining
+	if (pendingSize > 0) {
+		const blob = new Blob(pending, { type: 'application/octet-stream' });
+		await putChunk(db, `${mediaId}_${chunkIndex}`, blob);
 		chunkIndex++;
 	}
+	pending = []; // free memory
 
 	// Write metadata
 	const meta: DownloadMeta = {
@@ -140,7 +139,6 @@ export async function downloadMedia(
 export async function getDownloadedMedia(mediaId: number): Promise<{ blob: Blob } | null> {
 	const db = await openDB();
 
-	// Get metadata
 	const meta = await new Promise<DownloadMeta | undefined>((resolve, reject) => {
 		const tx = db.transaction(META_STORE, 'readonly');
 		const req = tx.objectStore(META_STORE).get(mediaId);
@@ -151,23 +149,23 @@ export async function getDownloadedMedia(mediaId: number): Promise<{ blob: Blob 
 	if (!meta) return null;
 
 	// v1 compatibility: if meta has a blob field directly, use it
-	if ('blob' in meta && meta.blob instanceof Blob) {
-		return { blob: meta.blob as Blob };
+	if ('blob' in meta && (meta as unknown as { blob: Blob }).blob instanceof Blob) {
+		return { blob: (meta as unknown as { blob: Blob }).blob };
 	}
 
 	if (!meta.chunkCount) return null;
 
 	// Reassemble chunks
-	const chunks: BlobPart[] = [];
+	const chunks: Blob[] = [];
 	for (let i = 0; i < meta.chunkCount; i++) {
-		const chunk = await new Promise<Uint8Array | undefined>((resolve, reject) => {
+		const chunk = await new Promise<Blob | undefined>((resolve, reject) => {
 			const tx = db.transaction(CHUNK_STORE, 'readonly');
 			const req = tx.objectStore(CHUNK_STORE).get(`${mediaId}_${i}`);
 			req.onsuccess = () => resolve(req.result);
 			req.onerror = () => reject(req.error);
 		});
-		if (!chunk) return null; // corrupted
-		chunks.push(chunk.buffer as ArrayBuffer);
+		if (!chunk) return null;
+		chunks.push(chunk instanceof Blob ? chunk : new Blob([chunk]));
 	}
 
 	return { blob: new Blob(chunks, { type: meta.contentType }) };
@@ -201,7 +199,6 @@ export async function listDownloads(): Promise<DownloadEntry[]> {
 export async function removeDownload(mediaId: number): Promise<void> {
 	const db = await openDB();
 
-	// Get meta to know chunk count
 	const meta = await new Promise<DownloadMeta | undefined>((resolve, reject) => {
 		const tx = db.transaction(META_STORE, 'readonly');
 		const req = tx.objectStore(META_STORE).get(mediaId);
@@ -209,7 +206,6 @@ export async function removeDownload(mediaId: number): Promise<void> {
 		req.onerror = () => reject(req.error);
 	});
 
-	// Delete chunks
 	if (meta?.chunkCount) {
 		for (let i = 0; i < meta.chunkCount; i++) {
 			await new Promise<void>((resolve, reject) => {
@@ -221,7 +217,6 @@ export async function removeDownload(mediaId: number): Promise<void> {
 		}
 	}
 
-	// Delete metadata
 	await new Promise<void>((resolve, reject) => {
 		const tx = db.transaction(META_STORE, 'readwrite');
 		tx.objectStore(META_STORE).delete(mediaId);
