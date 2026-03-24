@@ -47,6 +47,14 @@ export const GET: RequestHandler = async ({ params, request }) => {
 	const fileSize = stat.size;
 	const ext = path.extname(filePath).toLowerCase();
 
+	// ETag based on inode, size, mtime
+	const etag = `"${stat.ino}-${stat.size}-${stat.mtimeMs.toString(36)}"`;
+
+	// 304 Not Modified
+	if (request.headers.get('if-none-match') === etag) {
+		return new Response(null, { status: 304 });
+	}
+
 	const mimeTypes: Record<string, string> = {
 		'.mp4': 'video/mp4',
 		'.mkv': 'video/x-matroska',
@@ -63,6 +71,12 @@ export const GET: RequestHandler = async ({ params, request }) => {
 	};
 
 	const contentType = mimeTypes[ext] || 'application/octet-stream';
+	const cacheHeaders = {
+		'ETag': etag,
+		'Cache-Control': 'private, max-age=604800, immutable',
+		'Last-Modified': stat.mtime.toUTCString()
+	};
+
 	const range = request.headers.get('range');
 
 	if (range) {
@@ -77,7 +91,8 @@ export const GET: RequestHandler = async ({ params, request }) => {
 				'Content-Range': `bytes ${start}-${end}/${fileSize}`,
 				'Accept-Ranges': 'bytes',
 				'Content-Length': String(chunkSize),
-				'Content-Type': contentType
+				'Content-Type': contentType,
+				...cacheHeaders
 			}
 		});
 	}
@@ -86,7 +101,8 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		headers: {
 			'Content-Length': String(fileSize),
 			'Content-Type': contentType,
-			'Accept-Ranges': 'bytes'
+			'Accept-Ranges': 'bytes',
+			...cacheHeaders
 		}
 	});
 };

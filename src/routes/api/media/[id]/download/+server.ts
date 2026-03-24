@@ -45,11 +45,15 @@ export const GET: RequestHandler = async ({ params }) => {
 	const ext = path.extname(media.original_path);
 	const fileName = `${media.title}${ext}`;
 
+	const etag = `"${stat.ino}-${stat.size}-${stat.mtimeMs.toString(36)}"`;
+
 	return new Response(nodeToWebStream(fs.createReadStream(media.original_path)), {
 		headers: {
 			'Content-Type': 'application/octet-stream',
 			'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
-			'Content-Length': String(stat.size)
+			'Content-Length': String(stat.size),
+			'ETag': etag,
+			'Cache-Control': 'private, max-age=604800'
 		}
 	});
 };
