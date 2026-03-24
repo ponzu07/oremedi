@@ -1,19 +1,22 @@
 const DB_NAME = 'oremedi-downloads';
-const DB_VERSION = 1;
-const STORE_NAME = 'media';
+const DB_VERSION = 2;
+const META_STORE = 'media';
+const CHUNK_STORE = 'chunks';
+const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB per chunk
 
-interface DownloadedMedia {
+interface DownloadMeta {
 	id: number;
 	title: string;
 	category: string;
-	blob: Blob;
+	contentType: string;
+	totalSize: number;
+	chunkCount: number;
 	downloadedAt: string;
-	size: number;
 }
 
 export type DownloadStatus = 'downloaded' | 'needs-redownload';
 
-interface DownloadEntry {
+export interface DownloadEntry {
 	id: number;
 	title: string;
 	category: string;
@@ -28,9 +31,15 @@ function openDB(): Promise<IDBDatabase> {
 
 		request.onupgradeneeded = () => {
 			const db = request.result;
-			if (!db.objectStoreNames.contains(STORE_NAME)) {
-				db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+			// v1 -> v2: migrate from blob-in-meta to chunked storage
+			if (!db.objectStoreNames.contains(META_STORE)) {
+				db.createObjectStore(META_STORE, { keyPath: 'id' });
 			}
+			if (!db.objectStoreNames.contains(CHUNK_STORE)) {
+				db.createObjectStore(CHUNK_STORE);
+			}
+			// Clean up old blob entries (v1 had blob field in meta store)
+			// They'll be overwritten on next download
 		};
 
 		request.onsuccess = () => resolve(request.result);
@@ -53,6 +62,15 @@ export async function getStorageEstimate(): Promise<{ usage: number; quota: numb
 	return { usage: 0, quota: 0 };
 }
 
+function putChunk(db: IDBDatabase, key: string, data: Uint8Array): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const tx = db.transaction(CHUNK_STORE, 'readwrite');
+		tx.objectStore(CHUNK_STORE).put(data, key);
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+}
+
 export async function downloadMedia(
 	mediaId: number,
 	title: string,
@@ -65,70 +83,115 @@ export async function downloadMedia(
 	const contentLength = Number(response.headers.get('content-length'));
 	const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
 	const reader = response.body?.getReader();
-
 	if (!reader) throw new Error('No response body');
 
-	const chunks: BlobPart[] = [];
+	const db = await openDB();
+
+	// Stream chunks to IndexedDB incrementally
 	let loaded = 0;
+	let chunkIndex = 0;
+	let buffer = new Uint8Array(0);
 
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
-		chunks.push(value);
+
+		// Append to buffer
+		const newBuffer = new Uint8Array(buffer.length + value.length);
+		newBuffer.set(buffer);
+		newBuffer.set(value, buffer.length);
+		buffer = newBuffer;
 		loaded += value.length;
 		onProgress?.(loaded, contentLength);
+
+		// Flush full chunks to IndexedDB
+		while (buffer.length >= CHUNK_SIZE) {
+			await putChunk(db, `${mediaId}_${chunkIndex}`, buffer.slice(0, CHUNK_SIZE));
+			buffer = buffer.slice(CHUNK_SIZE);
+			chunkIndex++;
+		}
 	}
 
-	const blob = new Blob(chunks, { type: contentType });
+	// Write remaining buffer
+	if (buffer.length > 0) {
+		await putChunk(db, `${mediaId}_${chunkIndex}`, buffer);
+		chunkIndex++;
+	}
 
-	const db = await openDB();
-	const tx = db.transaction(STORE_NAME, 'readwrite');
-	const store = tx.objectStore(STORE_NAME);
-
-	const entry: DownloadedMedia = {
+	// Write metadata
+	const meta: DownloadMeta = {
 		id: mediaId,
 		title,
 		category,
-		blob,
-		downloadedAt: new Date().toISOString(),
-		size: blob.size
+		contentType,
+		totalSize: loaded,
+		chunkCount: chunkIndex,
+		downloadedAt: new Date().toISOString()
 	};
 
-	store.put(entry);
 	await new Promise<void>((resolve, reject) => {
+		const tx = db.transaction(META_STORE, 'readwrite');
+		tx.objectStore(META_STORE).put(meta);
 		tx.oncomplete = () => resolve();
 		tx.onerror = () => reject(tx.error);
 	});
 }
 
-export async function getDownloadedMedia(mediaId: number): Promise<DownloadedMedia | null> {
+export async function getDownloadedMedia(mediaId: number): Promise<{ blob: Blob } | null> {
 	const db = await openDB();
-	const tx = db.transaction(STORE_NAME, 'readonly');
-	const store = tx.objectStore(STORE_NAME);
 
-	return new Promise((resolve, reject) => {
-		const request = store.get(mediaId);
-		request.onsuccess = () => resolve(request.result ?? null);
-		request.onerror = () => reject(request.error);
+	// Get metadata
+	const meta = await new Promise<DownloadMeta | undefined>((resolve, reject) => {
+		const tx = db.transaction(META_STORE, 'readonly');
+		const req = tx.objectStore(META_STORE).get(mediaId);
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
 	});
+
+	if (!meta) return null;
+
+	// v1 compatibility: if meta has a blob field directly, use it
+	if ('blob' in meta && meta.blob instanceof Blob) {
+		return { blob: meta.blob as Blob };
+	}
+
+	if (!meta.chunkCount) return null;
+
+	// Reassemble chunks
+	const chunks: BlobPart[] = [];
+	for (let i = 0; i < meta.chunkCount; i++) {
+		const chunk = await new Promise<Uint8Array | undefined>((resolve, reject) => {
+			const tx = db.transaction(CHUNK_STORE, 'readonly');
+			const req = tx.objectStore(CHUNK_STORE).get(`${mediaId}_${i}`);
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error);
+		});
+		if (!chunk) return null; // corrupted
+		chunks.push(chunk.buffer as ArrayBuffer);
+	}
+
+	return { blob: new Blob(chunks, { type: meta.contentType }) };
 }
 
 export async function listDownloads(): Promise<DownloadEntry[]> {
 	const db = await openDB();
-	const tx = db.transaction(STORE_NAME, 'readonly');
-	const store = tx.objectStore(STORE_NAME);
+	const tx = db.transaction(META_STORE, 'readonly');
+	const store = tx.objectStore(META_STORE);
 
 	return new Promise((resolve, reject) => {
 		const request = store.getAll();
 		request.onsuccess = () => {
-			const entries: DownloadEntry[] = (request.result as DownloadedMedia[]).map((item) => ({
-				id: item.id,
-				title: item.title,
-				category: item.category,
-				status: item.size > 0 ? 'downloaded' : 'needs-redownload',
-				size: item.size,
-				downloadedAt: item.downloadedAt
-			}));
+			const entries: DownloadEntry[] = (request.result as (DownloadMeta & { size?: number; blob?: Blob })[]).map((item) => {
+				const size = item.totalSize ?? item.size ?? (item.blob instanceof Blob ? item.blob.size : 0);
+				return {
+					id: item.id,
+					title: item.title,
+					category: item.category,
+					status: size > 0 ? 'downloaded' : 'needs-redownload',
+					size,
+					downloadedAt: item.downloadedAt
+				};
+			});
 			resolve(entries);
 		};
 		request.onerror = () => reject(request.error);
@@ -137,10 +200,31 @@ export async function listDownloads(): Promise<DownloadEntry[]> {
 
 export async function removeDownload(mediaId: number): Promise<void> {
 	const db = await openDB();
-	const tx = db.transaction(STORE_NAME, 'readwrite');
-	const store = tx.objectStore(STORE_NAME);
-	store.delete(mediaId);
+
+	// Get meta to know chunk count
+	const meta = await new Promise<DownloadMeta | undefined>((resolve, reject) => {
+		const tx = db.transaction(META_STORE, 'readonly');
+		const req = tx.objectStore(META_STORE).get(mediaId);
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+
+	// Delete chunks
+	if (meta?.chunkCount) {
+		for (let i = 0; i < meta.chunkCount; i++) {
+			await new Promise<void>((resolve, reject) => {
+				const tx = db.transaction(CHUNK_STORE, 'readwrite');
+				tx.objectStore(CHUNK_STORE).delete(`${mediaId}_${i}`);
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+			});
+		}
+	}
+
+	// Delete metadata
 	await new Promise<void>((resolve, reject) => {
+		const tx = db.transaction(META_STORE, 'readwrite');
+		tx.objectStore(META_STORE).delete(mediaId);
 		tx.oncomplete = () => resolve();
 		tx.onerror = () => reject(tx.error);
 	});

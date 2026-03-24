@@ -460,6 +460,13 @@
 					</button>
 				{/if}
 
+				<a class="vp-btn" href="/api/media/{media.id}/download" download aria-label="Save to device">
+					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M12 3v12m0 0l-4-4m4 4l4-4" />
+						<rect x="4" y="17" width="16" height="4" rx="1" />
+					</svg>
+				</a>
+
 				<button class="vp-btn" onclick={toggleFullscreen} aria-label="Fullscreen">
 					<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<polyline points="15 3 21 3 21 9" />
@@ -588,6 +595,13 @@
 					Save Offline
 				</button>
 			{/if}
+			<a class="vp-action-btn" href="/api/media/{media.id}/download" download>
+				<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M12 3v12m0 0l-4-4m4 4l4-4" />
+					<rect x="4" y="17" width="16" height="4" rx="1" />
+				</svg>
+				Save to Device
+			</a>
 		</div>
 	</div>
 
@@ -808,6 +822,12 @@
 					</svg>
 				</button>
 			{/if}
+			<a class="amp-sub-btn" href="/api/media/{media.id}/download" download aria-label="Save to device">
+				<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M12 3v12m0 0l-4-4m4 4l4-4" />
+					<rect x="4" y="17" width="16" height="4" rx="1" />
+				</svg>
+			</a>
 		</div>
 
 		{:else}
