@@ -146,14 +146,7 @@ export async function getDownloadedMedia(mediaId: number): Promise<{ blob: Blob 
 		req.onerror = () => reject(req.error);
 	});
 
-	if (!meta) return null;
-
-	// v1 compatibility: if meta has a blob field directly, use it
-	if ('blob' in meta && (meta as unknown as { blob: Blob }).blob instanceof Blob) {
-		return { blob: (meta as unknown as { blob: Blob }).blob };
-	}
-
-	if (!meta.chunkCount) return null;
+	if (!meta?.chunkCount) return null;
 
 	// Reassemble chunks
 	const chunks: Blob[] = [];
@@ -165,7 +158,7 @@ export async function getDownloadedMedia(mediaId: number): Promise<{ blob: Blob 
 			req.onerror = () => reject(req.error);
 		});
 		if (!chunk) return null;
-		chunks.push(chunk instanceof Blob ? chunk : new Blob([chunk]));
+		chunks.push(chunk);
 	}
 
 	return { blob: new Blob(chunks, { type: meta.contentType }) };
@@ -179,8 +172,8 @@ export async function listDownloads(): Promise<DownloadEntry[]> {
 	return new Promise((resolve, reject) => {
 		const request = store.getAll();
 		request.onsuccess = () => {
-			const entries: DownloadEntry[] = (request.result as (DownloadMeta & { size?: number; blob?: Blob })[]).map((item) => {
-				const size = item.totalSize ?? item.size ?? (item.blob instanceof Blob ? item.blob.size : 0);
+			const entries: DownloadEntry[] = (request.result as DownloadMeta[]).map((item) => {
+				const size = item.totalSize ?? 0;
 				return {
 					id: item.id,
 					title: item.title,
