@@ -210,19 +210,33 @@ function finishMedia(
 	duration: number | null,
 	callback: () => void
 ) {
-	const chapters = extractChapters(originalPath);
-	if (chapters.length > 0) saveChapters(db, mediaId, chapters);
+	try {
+		const chapters = extractChapters(originalPath);
+		if (chapters.length > 0) saveChapters(db, mediaId, chapters);
 
-	// Move original to backup
-	const relativePath = path.relative(mediaPath, originalPath);
-	const backupPath = path.join(originalsPath, relativePath);
-	fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-	fs.renameSync(originalPath, backupPath);
+		// Move original to backup (copyFile+unlink for cross-device support)
+		const relativePath = path.relative(mediaPath, originalPath);
+		const backupPath = path.join(originalsPath, relativePath);
+		fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+		try {
+			fs.renameSync(originalPath, backupPath);
+		} catch (e: unknown) {
+			if ((e as NodeJS.ErrnoException).code === 'EXDEV') {
+				fs.copyFileSync(originalPath, backupPath);
+				fs.unlinkSync(originalPath);
+			} else {
+				throw e;
+			}
+		}
 
-	const newHash = computeFileHash(outputPath);
-	db.prepare(
-		"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
-	).run(outputPath, thumbPath, duration ? Math.round(duration) : null, newHash, mediaId);
+		const newHash = computeFileHash(outputPath);
+		db.prepare(
+			"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
+		).run(outputPath, thumbPath, duration ? Math.round(duration) : null, newHash, mediaId);
+	} catch (e) {
+		console.error(`[transcoder] finishMedia failed for media ${mediaId}:`, (e as Error).message);
+		db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(mediaId);
+	}
 
 	callback();
 }
