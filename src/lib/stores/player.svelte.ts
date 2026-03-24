@@ -163,6 +163,9 @@ function createPlayerStore() {
 				await new Promise<void>(resolve => { videoBindResolve = resolve; });
 			}
 			if (videoElement) {
+				videoElement.poster = item.thumbnailPath
+					? `/api/media/${item.mediaId}/thumbnail`
+					: '';
 				videoElement.src = url;
 				videoElement.playbackRate = state.playbackRate;
 				try {

@@ -50,7 +50,7 @@
 	class:gvw-mini={isCurrentVideo && !isFullPlayer}
 	class:gvw-hidden={!isCurrentVideo}
 >
-	<video bind:this={videoEl} preload="metadata"></video>
+	<video bind:this={videoEl} playsinline preload="none"></video>
 </div>
 
 {@render children()}

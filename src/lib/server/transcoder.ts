@@ -129,6 +129,9 @@ function parseTimeToSeconds(timeStr: string): number {
 	return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]) + parseInt(match[4]) / 100;
 }
 
+// Scale down to 1080p max (no upscale). -2 ensures even dimensions.
+const SCALE_FILTER = "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2";
+
 function buildVideoArgs(input: string, output: string, hwAccel: HwAccel): string[] {
 	if (hwAccel === 'vaapi') {
 		return [
@@ -136,6 +139,7 @@ function buildVideoArgs(input: string, output: string, hwAccel: HwAccel): string
 			'-hwaccel_device', '/dev/dri/renderD128',
 			'-hwaccel_output_format', 'vaapi',
 			'-i', input,
+			'-vf', `${SCALE_FILTER},format=nv12,hwupload`,
 			'-c:v', 'h264_vaapi',
 			'-qp', '23',
 			'-c:a', 'aac', '-b:a', '192k',
@@ -146,6 +150,7 @@ function buildVideoArgs(input: string, output: string, hwAccel: HwAccel): string
 
 	return [
 		'-i', input,
+		'-vf', SCALE_FILTER,
 		'-c:v', 'libx264',
 		'-preset', 'faster',
 		'-crf', '23',
