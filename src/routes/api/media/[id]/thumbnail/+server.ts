@@ -23,12 +23,23 @@ export const GET: RequestHandler = async ({ params }) => {
 		return new Response('Forbidden', { status: 403 });
 	}
 
-	const stream = fs.createReadStream(media.thumbnail_path);
+	const nodeStream = fs.createReadStream(media.thumbnail_path);
+	let closed = false;
 	const webStream = new ReadableStream({
 		start(controller) {
-			stream.on('data', (chunk) => controller.enqueue(chunk));
-			stream.on('end', () => controller.close());
-			stream.on('error', (err) => controller.error(err));
+			nodeStream.on('data', (chunk) => {
+				if (!closed) controller.enqueue(chunk);
+			});
+			nodeStream.on('end', () => {
+				if (!closed) { closed = true; controller.close(); }
+			});
+			nodeStream.on('error', (err) => {
+				if (!closed) { closed = true; controller.error(err); }
+			});
+		},
+		cancel() {
+			closed = true;
+			nodeStream.destroy();
 		}
 	});
 	return new Response(webStream, {

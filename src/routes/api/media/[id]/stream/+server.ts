@@ -4,6 +4,27 @@ import { assertSafePath } from '$lib/server/config';
 import fs from 'fs';
 import path from 'path';
 
+function nodeToWebStream(stream: fs.ReadStream): ReadableStream {
+	let closed = false;
+	return new ReadableStream({
+		start(controller) {
+			stream.on('data', (chunk) => {
+				if (!closed) controller.enqueue(chunk);
+			});
+			stream.on('end', () => {
+				if (!closed) { closed = true; controller.close(); }
+			});
+			stream.on('error', (err) => {
+				if (!closed) { closed = true; controller.error(err); }
+			});
+		},
+		cancel() {
+			closed = true;
+			stream.destroy();
+		}
+	});
+}
+
 export const GET: RequestHandler = async ({ params, request }) => {
 	const db = getDb();
 	const media = db.prepare('SELECT original_path FROM media WHERE id = ?').get(params.id) as { original_path: string } | undefined;
@@ -50,16 +71,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 		const chunkSize = end - start + 1;
 
-		const stream = fs.createReadStream(filePath, { start, end });
-		const webStream = new ReadableStream({
-			start(controller) {
-				stream.on('data', (chunk) => controller.enqueue(chunk));
-				stream.on('end', () => controller.close());
-				stream.on('error', (err) => controller.error(err));
-			}
-		});
-
-		return new Response(webStream, {
+		return new Response(nodeToWebStream(fs.createReadStream(filePath, { start, end })), {
 			status: 206,
 			headers: {
 				'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -70,16 +82,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		});
 	}
 
-	const stream = fs.createReadStream(filePath);
-	const webStream = new ReadableStream({
-		start(controller) {
-			stream.on('data', (chunk) => controller.enqueue(chunk));
-			stream.on('end', () => controller.close());
-			stream.on('error', (err) => controller.error(err));
-		}
-	});
-
-	return new Response(webStream, {
+	return new Response(nodeToWebStream(fs.createReadStream(filePath)), {
 		headers: {
 			'Content-Length': String(fileSize),
 			'Content-Type': contentType,
