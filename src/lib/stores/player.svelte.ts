@@ -133,12 +133,15 @@ function createPlayerStore() {
 		let url = `/api/media/${item.mediaId}/stream`;
 		let offline = false;
 
-		if (!navigator.onLine) {
+		// Use offline content if available (saves bandwidth even when online)
+		try {
 			const downloaded = await getDownloadedMedia(item.mediaId);
 			if (downloaded) {
 				url = URL.createObjectURL(downloaded.blob);
 				offline = true;
 			}
+		} catch {
+			// IndexedDB unavailable, fall through to streaming
 		}
 
 		state.mediaId = item.mediaId;

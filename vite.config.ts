@@ -30,9 +30,8 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				// Don't cache API responses or media streams in service worker
-				navigateFallback: '/',
-				navigateFallbackDenylist: [/^\/api\//],
+				navigateFallback: '/downloads',
+				navigateFallbackDenylist: [/^\/api\//, /^\/login/],
 				runtimeCaching: [
 					{
 						urlPattern: /^\/api\/media\/\d+\/thumbnail/,
