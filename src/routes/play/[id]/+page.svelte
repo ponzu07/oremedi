@@ -261,6 +261,15 @@
 		downloading = false;
 	}
 
+	function saveToDevice() {
+		// Use hidden iframe to trigger download without leaving PWA
+		const iframe = document.createElement('iframe');
+		iframe.style.display = 'none';
+		iframe.src = `/api/media/${media.id}/download`;
+		document.body.appendChild(iframe);
+		setTimeout(() => iframe.remove(), 60000);
+	}
+
 	const formatTime = formatDuration;
 
 	const tagsText = (() => {
@@ -460,7 +469,7 @@
 					</button>
 				{/if}
 
-				<button class="vp-btn" onclick={() => { window.open(`/api/media/${media.id}/download`, "_blank"); }} aria-label="Save to device">
+				<button class="vp-btn" onclick={saveToDevice} aria-label="Save to device">
 					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M12 3v12m0 0l-4-4m4 4l4-4" />
 						<rect x="4" y="17" width="16" height="4" rx="1" />
@@ -595,7 +604,7 @@
 					Save Offline
 				</button>
 			{/if}
-			<button class="vp-action-btn" onclick={() => window.open(`/api/media/${media.id}/download`, "_blank")}>
+			<button class="vp-action-btn" onclick={saveToDevice}>
 				<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<path d="M12 3v12m0 0l-4-4m4 4l4-4" />
 					<rect x="4" y="17" width="16" height="4" rx="1" />
@@ -822,7 +831,7 @@
 					</svg>
 				</button>
 			{/if}
-			<button class="amp-sub-btn" onclick={() => window.open(`/api/media/${media.id}/download`, "_blank")} aria-label="Save to device">
+			<button class="amp-sub-btn" onclick={saveToDevice} aria-label="Save to device">
 				<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<path d="M12 3v12m0 0l-4-4m4 4l4-4" />
 					<rect x="4" y="17" width="16" height="4" rx="1" />
