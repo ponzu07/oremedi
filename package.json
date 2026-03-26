@@ -21,7 +21,7 @@
 		"@types/jsonwebtoken": "^9.0.10",
 		"daisyui": "^5.5.19",
 		"husky": "^9.1.7",
-		"svelte": "^5.51.0",
+		"svelte": "^5.55.0",
 		"svelte-check": "^4.4.2",
 		"tailwindcss": "^4.2.2",
 		"tsx": "^4.21.0",
