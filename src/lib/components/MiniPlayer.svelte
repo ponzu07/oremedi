@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { playerStore, isVideoCategory } from '$lib/stores/player.svelte';
-	import { SkipBack, SkipForward, Play, Pause } from 'lucide-svelte';
+	import { SkipBack, SkipForward, Play, Pause, AlertCircle, RefreshCw, Loader } from 'lucide-svelte';
 
 	const ps = $derived(playerStore.state);
 	const isVideo = $derived(isVideoCategory(ps.category));
+	const hasError = $derived(!!ps.error && !ps.error.includes('リトライ中') && !ps.error.includes('再試行中'));
 
 	const progress = $derived(
 		ps.duration > 0 ? (ps.currentTime / ps.duration) * 100 : 0
@@ -85,14 +86,20 @@
 			<!-- Left: thumbnail/video slot + title (link to full player) -->
 			<a href="/play/{ps.mediaId}" class="mini-info-link">
 				{#if isVideo}
-					<!-- Blank slot: the global fixed <video> visually overlaps here -->
 					<div class="mini-video-slot" aria-hidden="true"></div>
 				{:else if ps.thumbnailPath}
 					<img src={`/api/media/${ps.mediaId}/thumbnail`} alt={ps.title} class="mini-thumb" />
 				{:else}
 					<div class="mini-thumb-placeholder">&#9835;</div>
 				{/if}
-				<span class="mini-title">{ps.title}</span>
+				<div class="mini-title-area">
+					<span class="mini-title">{ps.title}</span>
+					{#if hasError}
+						<span class="mini-error"><AlertCircle size={12} /> {ps.error}</span>
+					{:else if ps.isBuffering}
+						<span class="mini-buffering"><Loader size={12} class="spin" /> バッファリング中…</span>
+					{/if}
+				</div>
 			</a>
 
 			<!-- Center: prev / play-pause / next -->
@@ -100,13 +107,19 @@
 				<button class="mini-btn" title="Previous" onclick={() => playerStore.previous()}>
 					<SkipBack size={22} />
 				</button>
-				<button class="mini-btn" title={ps.isPlaying ? 'Pause' : 'Play'} onclick={() => playerStore.togglePlayPause()}>
-					{#if ps.isPlaying}
-						<Pause size={24} />
-					{:else}
-						<Play size={24} />
-					{/if}
-				</button>
+				{#if hasError}
+					<button class="mini-btn retry-btn" title="リトライ" onclick={() => playerStore.retryPlayback()}>
+						<RefreshCw size={22} />
+					</button>
+				{:else}
+					<button class="mini-btn" title={ps.isPlaying ? 'Pause' : 'Play'} onclick={() => playerStore.togglePlayPause()}>
+						{#if ps.isPlaying}
+							<Pause size={24} />
+						{:else}
+							<Play size={24} />
+						{/if}
+					</button>
+				{/if}
 				<button class="mini-btn" title="Next" onclick={() => playerStore.next()}>
 					<SkipForward size={22} />
 				</button>
@@ -220,12 +233,52 @@
 		background: transparent;
 	}
 
+	.mini-title-area {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		overflow: hidden;
+	}
+
 	.mini-title {
 		color: var(--color-base-content);
 		font-size: 1rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.mini-error {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		color: var(--color-error, #f44);
+		font-size: 0.7rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.mini-buffering {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		color: var(--color-warning, #fa0);
+		font-size: 0.7rem;
+		white-space: nowrap;
+	}
+
+	.retry-btn {
+		color: var(--color-error, #f44) !important;
+	}
+
+	:global(.spin) {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
 	}
 
 	/* Center: controls */

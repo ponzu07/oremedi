@@ -4,6 +4,7 @@
 	import type { PageData } from './$types';
 	import CastButton from '$lib/components/CastButton.svelte';
 	import { playerStore, type QueueItem, isVideoCategory } from '$lib/stores/player.svelte';
+	import { AlertCircle, RefreshCw } from 'lucide-svelte';
 	import {
 		downloadMedia,
 		getDownloadedMedia
@@ -306,20 +307,34 @@
 			<span class="vp-title">{playerStore.state.title || media.title}</span>
 		</div>
 
-		<!-- Center play/pause -->
+		<!-- Center play/pause/error -->
 		<div class="vp-center">
-			<button class="vp-center-btn" onclick={(e) => { e.stopPropagation(); playerStore.togglePlayPause(); }} aria-label={playerStore.state.isPlaying ? 'Pause' : 'Play'}>
-				{#if playerStore.state.isPlaying}
-					<svg viewBox="0 0 24 24" width="36" height="36" fill="white">
-						<rect x="6" y="4" width="4" height="16" rx="1" />
-						<rect x="14" y="4" width="4" height="16" rx="1" />
-					</svg>
-				{:else}
-					<svg viewBox="0 0 24 24" width="36" height="36" fill="white">
-						<polygon points="6,3 20,12 6,21" />
-					</svg>
-				{/if}
-			</button>
+			{#if playerStore.state.error && !playerStore.state.error.includes('リトライ中') && !playerStore.state.error.includes('再試行中')}
+				<div class="vp-error-overlay" onclick={(e) => e.stopPropagation()}>
+					<AlertCircle size={32} color="white" />
+					<span class="vp-error-text">{playerStore.state.error}</span>
+					<button class="vp-retry-btn" onclick={() => playerStore.retryPlayback()}>
+						<RefreshCw size={18} /> リトライ
+					</button>
+				</div>
+			{:else if playerStore.state.isBuffering && !playerStore.state.isPlaying}
+				<div class="vp-buffering-indicator">
+					<div class="vp-spinner"></div>
+				</div>
+			{:else}
+				<button class="vp-center-btn" onclick={(e) => { e.stopPropagation(); playerStore.togglePlayPause(); }} aria-label={playerStore.state.isPlaying ? 'Pause' : 'Play'}>
+					{#if playerStore.state.isPlaying}
+						<svg viewBox="0 0 24 24" width="36" height="36" fill="white">
+							<rect x="6" y="4" width="4" height="16" rx="1" />
+							<rect x="14" y="4" width="4" height="16" rx="1" />
+						</svg>
+					{:else}
+						<svg viewBox="0 0 24 24" width="36" height="36" fill="white">
+							<polygon points="6,3 20,12 6,21" />
+						</svg>
+					{/if}
+				</button>
+			{/if}
 		</div>
 
 		<!-- Bottom bar -->
@@ -712,6 +727,17 @@
 		<div class="amp-info">
 			<div class="amp-title">{playerStore.state.title || media.title}</div>
 			<div class="amp-subtitle">{tagsText}</div>
+			{#if playerStore.state.error && !playerStore.state.error.includes('リトライ中') && !playerStore.state.error.includes('再試行中')}
+				<div class="amp-error">
+					<AlertCircle size={14} />
+					<span>{playerStore.state.error}</span>
+					<button class="amp-retry-btn" onclick={() => playerStore.retryPlayback()}>
+						<RefreshCw size={14} /> リトライ
+					</button>
+				</div>
+			{:else if playerStore.state.isBuffering}
+				<div class="amp-buffering">バッファリング中…</div>
+			{/if}
 		</div>
 
 		<!-- Seekbar -->
@@ -970,6 +996,61 @@
 
 	.vp-center-btn:active {
 		background: rgba(0,0,0,0.7);
+	}
+
+	.vp-error-overlay {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 1rem;
+		background: rgba(0, 0, 0, 0.6);
+		border-radius: 12px;
+		pointer-events: auto;
+	}
+
+	.vp-error-text {
+		color: white;
+		font-size: 0.85rem;
+		text-align: center;
+	}
+
+	.vp-retry-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.4rem 1rem;
+		background: var(--color-primary);
+		color: white;
+		border: none;
+		border-radius: 9999px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.vp-retry-btn:active {
+		opacity: 0.8;
+	}
+
+	.vp-buffering-indicator {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+	}
+
+	.vp-spinner {
+		width: 40px;
+		height: 40px;
+		border: 3px solid rgba(255, 255, 255, 0.3);
+		border-top-color: white;
+		border-radius: 50%;
+		animation: vp-spin 0.8s linear infinite;
+	}
+
+	@keyframes vp-spin {
+		to { transform: rotate(360deg); }
 	}
 
 	/* Bottom bar */
@@ -1619,6 +1700,41 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.amp-error {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+		margin-top: 0.5rem;
+		color: var(--color-error, #f44);
+		font-size: 0.8rem;
+	}
+
+	.amp-retry-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.25rem 0.75rem;
+		background: var(--color-error, #f44);
+		color: white;
+		border: none;
+		border-radius: 9999px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		cursor: pointer;
+		margin-left: 0.25rem;
+	}
+
+	.amp-retry-btn:active {
+		opacity: 0.8;
+	}
+
+	.amp-buffering {
+		margin-top: 0.35rem;
+		color: var(--color-warning, #fa0);
+		font-size: 0.8rem;
 	}
 
 	/* Seekbar */

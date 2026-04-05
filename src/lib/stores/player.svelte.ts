@@ -17,6 +17,8 @@ interface PlayerState {
 	category: string;
 	thumbnailPath: string | null;
 	isPlaying: boolean;
+	isBuffering: boolean;
+	error: string | null;
 	currentTime: number;
 	duration: number;
 	mediaUrl: string;
@@ -39,6 +41,8 @@ function createPlayerStore() {
 		category: '',
 		thumbnailPath: null,
 		isPlaying: false,
+		isBuffering: false,
+		error: null,
 		currentTime: 0,
 		duration: 0,
 		mediaUrl: '',
@@ -58,38 +62,78 @@ function createPlayerStore() {
 	let videoElement: HTMLVideoElement | null = null;
 	let videoBindResolve: (() => void) | null = null;
 	let videoReady = false;
+	let currentBlobUrl: string | null = null;
 
 	function getActiveElement(): HTMLAudioElement | HTMLVideoElement | null {
 		return isVideoCategory(state.category) ? videoElement : audioElement;
 	}
 
-	function bindAudio(el: HTMLAudioElement) {
-		audioElement = el;
+	function bindMediaEvents(el: HTMLAudioElement | HTMLVideoElement, isVideo: boolean) {
+		const guard = () => isVideo === isVideoCategory(state.category);
+
 		el.addEventListener('timeupdate', () => {
-			if (!isVideoCategory(state.category)) {
-				state.currentTime = el.currentTime;
-			}
+			if (guard()) state.currentTime = el.currentTime;
 		});
 		el.addEventListener('durationchange', () => {
-			if (!isVideoCategory(state.category)) {
-				state.duration = el.duration;
-			}
+			if (guard()) state.duration = el.duration;
 		});
 		el.addEventListener('play', () => {
-			if (!isVideoCategory(state.category)) {
+			if (guard()) {
 				state.isPlaying = true;
+				state.error = null;
 			}
 		});
 		el.addEventListener('pause', () => {
-			if (!isVideoCategory(state.category)) {
-				state.isPlaying = false;
-			}
+			if (guard()) state.isPlaying = false;
 		});
 		el.addEventListener('ended', () => {
-			if (!isVideoCategory(state.category)) {
-				next();
+			if (guard()) next();
+		});
+		el.addEventListener('waiting', () => {
+			if (guard()) state.isBuffering = true;
+		});
+		el.addEventListener('playing', () => {
+			if (guard()) {
+				state.isBuffering = false;
+				state.error = null;
 			}
 		});
+		el.addEventListener('canplay', () => {
+			if (guard()) state.isBuffering = false;
+		});
+		el.addEventListener('error', () => {
+			if (!guard()) return;
+			const err = el.error;
+			let msg = '再生エラーが発生しました';
+			if (err) {
+				switch (err.code) {
+					case MediaError.MEDIA_ERR_ABORTED: msg = '再生が中断されました'; break;
+					case MediaError.MEDIA_ERR_NETWORK: msg = 'ネットワークエラー'; break;
+					case MediaError.MEDIA_ERR_DECODE: msg = 'デコードエラー'; break;
+					case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED: msg = '非対応の形式です'; break;
+				}
+			}
+			state.error = msg;
+			state.isPlaying = false;
+			state.isBuffering = false;
+			handlePlaybackError();
+		});
+		el.addEventListener('stalled', () => {
+			if (!guard()) return;
+			state.isBuffering = true;
+			// stalled状態が長く続いたらエラーとして扱う
+			setTimeout(() => {
+				if (guard() && el.readyState < 3 && !el.paused) {
+					state.error = 'バッファリングがタイムアウトしました';
+					handlePlaybackError();
+				}
+			}, 15000);
+		});
+	}
+
+	function bindAudio(el: HTMLAudioElement) {
+		audioElement = el;
+		bindMediaEvents(el, false);
 	}
 
 	function bindVideo(el: HTMLVideoElement) {
@@ -99,49 +143,41 @@ function createPlayerStore() {
 			videoBindResolve();
 			videoBindResolve = null;
 		}
-		el.addEventListener('timeupdate', () => {
-			if (isVideoCategory(state.category)) {
-				state.currentTime = el.currentTime;
-			}
-		});
-		el.addEventListener('durationchange', () => {
-			if (isVideoCategory(state.category)) {
-				state.duration = el.duration;
-			}
-		});
-		el.addEventListener('play', () => {
-			if (isVideoCategory(state.category)) {
-				state.isPlaying = true;
-			}
-		});
-		el.addEventListener('pause', () => {
-			if (isVideoCategory(state.category)) {
-				state.isPlaying = false;
-			}
-		});
-		el.addEventListener('ended', () => {
-			if (isVideoCategory(state.category)) {
-				next();
-			}
-		});
+		bindMediaEvents(el, true);
+	}
+
+	let retryCount = 0;
+	const MAX_RETRIES = 2;
+
+	function revokePreviousBlobUrl() {
+		if (currentBlobUrl) {
+			URL.revokeObjectURL(currentBlobUrl);
+			currentBlobUrl = null;
+		}
 	}
 
 	/**
 	 * Internal: load and play a track from a QueueItem
+	 * forceStream: trueならキャッシュを無視してストリーミング
 	 */
-	async function loadAndPlay(item: QueueItem) {
+	async function loadAndPlay(item: QueueItem, forceStream = false) {
+		revokePreviousBlobUrl();
+
 		let url = `/api/media/${item.mediaId}/stream`;
 		let offline = false;
 
-		// Use offline content if available (saves bandwidth even when online)
-		try {
-			const downloaded = await getDownloadedMedia(item.mediaId);
-			if (downloaded) {
-				url = URL.createObjectURL(downloaded.blob);
-				offline = true;
+		if (!forceStream) {
+			try {
+				const downloaded = await getDownloadedMedia(item.mediaId);
+				if (downloaded) {
+					const blobUrl = URL.createObjectURL(downloaded.blob);
+					currentBlobUrl = blobUrl;
+					url = blobUrl;
+					offline = true;
+				}
+			} catch {
+				// IndexedDB unavailable, fall through to streaming
 			}
-		} catch {
-			// IndexedDB unavailable, fall through to streaming
 		}
 
 		state.mediaId = item.mediaId;
@@ -150,20 +186,30 @@ function createPlayerStore() {
 		state.thumbnailPath = item.thumbnailPath;
 		state.mediaUrl = url;
 		state.isOffline = offline;
+		state.isBuffering = true;
+		state.error = null;
 		state.currentTime = 0;
 		state.duration = 0;
 
 		const isVideo = isVideoCategory(item.category);
 
 		if (isVideo) {
-			// Stop audio if it was playing
 			if (audioElement && !audioElement.paused) {
 				audioElement.pause();
 				audioElement.src = '';
 			}
-			// Wait for video element to be bound (child onMount runs before layout onMount)
 			if (!videoReady) {
-				await new Promise<void>(resolve => { videoBindResolve = resolve; });
+				const timeoutMs = 5000;
+				await Promise.race([
+					new Promise<void>(resolve => { videoBindResolve = resolve; }),
+					new Promise<void>((_, reject) =>
+						setTimeout(() => reject(new Error('Video element bind timeout')), timeoutMs)
+					)
+				]).catch(() => {
+					state.error = '動画プレーヤーの初期化に失敗しました';
+					state.isBuffering = false;
+					return;
+				});
 			}
 			if (videoElement) {
 				videoElement.poster = item.thumbnailPath
@@ -173,12 +219,18 @@ function createPlayerStore() {
 				videoElement.playbackRate = state.playbackRate;
 				try {
 					await videoElement.play();
+					retryCount = 0;
 				} catch (e) {
 					console.warn('Video playback failed:', e);
+					state.isPlaying = false;
+					state.isBuffering = false;
+					if (!state.error) {
+						state.error = '動画の再生に失敗しました';
+					}
+					handlePlaybackError();
 				}
 			}
 		} else {
-			// Stop video if it was playing
 			if (videoElement && !videoElement.paused) {
 				videoElement.pause();
 				videoElement.src = '';
@@ -188,11 +240,49 @@ function createPlayerStore() {
 				audioElement.playbackRate = state.playbackRate;
 				try {
 					await audioElement.play();
+					retryCount = 0;
 				} catch (e) {
 					console.warn('Audio playback failed:', e);
+					state.isPlaying = false;
+					state.isBuffering = false;
+					if (!state.error) {
+						state.error = '音声の再生に失敗しました';
+					}
+					handlePlaybackError();
 				}
 			}
 		}
+	}
+
+	/**
+	 * エラー時の自動リカバリ:
+	 * 1. キャッシュ再生中 → ストリーミングにフォールバック
+	 * 2. ストリーミング中 → リトライ (最大2回)
+	 * 3. リトライ上限 → エラー表示のまま停止 (ユーザーがタップでリトライ)
+	 */
+	function handlePlaybackError() {
+		if (state.mediaId === null || state.currentIndex < 0) return;
+		const item = state.queue[state.currentIndex];
+		if (!item) return;
+
+		if (state.isOffline) {
+			// キャッシュ再生で失敗 → ストリーミングにフォールバック
+			state.error = 'キャッシュ再生に失敗。ストリーミングで再試行中…';
+			retryCount = 0;
+			setTimeout(() => loadAndPlay(item, true), 500);
+		} else if (retryCount < MAX_RETRIES) {
+			retryCount++;
+			state.error = `再生エラー。リトライ中… (${retryCount}/${MAX_RETRIES})`;
+			setTimeout(() => loadAndPlay(item, true), 1000 * retryCount);
+		}
+		// リトライ上限超え → state.errorが残り、UIがリトライボタンを表示
+	}
+
+	function retryPlayback() {
+		if (state.currentIndex < 0 || !state.queue[state.currentIndex]) return;
+		retryCount = 0;
+		state.error = null;
+		loadAndPlay(state.queue[state.currentIndex]);
 	}
 
 	/**
@@ -472,7 +562,8 @@ function createPlayerStore() {
 		setFullPlayer,
 		getVideoElement,
 		toggleMute,
-		setVolume
+		setVolume,
+		retryPlayback
 	};
 }
 
