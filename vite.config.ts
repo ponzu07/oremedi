@@ -32,6 +32,12 @@ export default defineConfig({
 			workbox: {
 				navigateFallback: '/downloads',
 				navigateFallbackDenylist: [/^\/api\//, /^\/login/],
+				modifyURLPrefix: {},
+				globPatterns: [
+					'client/**/*.{js,css,ico,png,svg,webp,webmanifest}',
+					'client/*.webmanifest',
+					'client/_app/version.json'
+				],
 				runtimeCaching: [
 					{
 						urlPattern: /^\/api\/media\/\d+\/thumbnail/,
@@ -45,6 +51,13 @@ export default defineConfig({
 			}
 		})
 	],
+	build: {
+		rolldownOptions: {
+			checks: {
+				pluginTimings: false
+			}
+		}
+	},
 	test: {
 		include: ['tests/**/*.test.ts']
 	}
