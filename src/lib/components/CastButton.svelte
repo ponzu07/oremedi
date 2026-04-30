@@ -62,9 +62,12 @@
 			if (!res.ok) {
 				throw new Error('cast-url request failed');
 			}
-			const { url, contentType } = await res.json() as { url: string; contentType: string };
+			const body = await res.json() as { url?: unknown; contentType?: unknown };
+			if (typeof body.url !== 'string' || typeof body.contentType !== 'string') {
+				throw new Error('invalid cast-url response');
+			}
 
-			const mediaInfo = new chrome.cast.media.MediaInfo(url, contentType);
+			const mediaInfo = new chrome.cast.media.MediaInfo(body.url, body.contentType);
 			mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
 			mediaInfo.metadata.title = title;
 
