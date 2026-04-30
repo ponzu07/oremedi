@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
 import { config } from '$lib/server/config';
-import { computeFileHash } from '$lib/server/file-hash';
+import { computeFileHashAsync } from '$lib/server/file-hash';
 import fs from 'fs';
 import path from 'path';
 
@@ -15,19 +15,23 @@ const VIDEO_EXTENSIONS = new Set([
 	'.mp4', '.mkv', '.avi', '.wmv', '.flv', '.mov', '.webm'
 ]);
 
-function scanDirectory(dir: string): string[] {
+async function scanDirectory(dir: string): Promise<string[]> {
 	const files: string[] = [];
 	if (!fs.existsSync(dir)) return files;
 
-	const entries = fs.readdirSync(dir, { withFileTypes: true });
-	for (const entry of entries) {
-		const fullPath = path.join(dir, entry.name);
-		if (entry.isDirectory()) {
-			files.push(...scanDirectory(fullPath));
-		} else if (MEDIA_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-			files.push(fullPath);
+	const pendingDirs = [dir];
+	for (const currentDir of pendingDirs) {
+		const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+		for (const entry of entries) {
+			const fullPath = path.join(currentDir, entry.name);
+			if (entry.isDirectory()) {
+				pendingDirs.push(fullPath);
+			} else if (MEDIA_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+				files.push(fullPath);
+			}
 		}
 	}
+
 	return files;
 }
 
@@ -51,7 +55,7 @@ export const POST: RequestHandler = async () => {
 		return json({ error: `Media path not found: ${mediaPath}` }, { status: 400 });
 	}
 
-	const diskFiles = scanDirectory(mediaPath);
+	const diskFiles = await scanDirectory(mediaPath);
 	const diskFileSet = new Set(diskFiles);
 
 	// Load all existing media
@@ -81,7 +85,7 @@ export const POST: RequestHandler = async () => {
 	// Phase 1: Backfill hashes for existing media that don't have one
 	for (const m of allMedia) {
 		if (!m.file_hash && fs.existsSync(m.original_path)) {
-			const hash = computeFileHash(m.original_path);
+			const hash = await computeFileHashAsync(m.original_path);
 			if (hash) {
 				updateHash.run(hash, m.id);
 				hashToMedia.set(hash, { id: m.id, original_path: m.original_path });
@@ -97,7 +101,7 @@ export const POST: RequestHandler = async () => {
 			continue;
 		}
 
-		const hash = computeFileHash(filePath);
+		const hash = await computeFileHashAsync(filePath);
 
 		// Check if this file was moved/renamed (hash matches existing entry with missing file)
 		if (hash && hashToMedia.has(hash)) {

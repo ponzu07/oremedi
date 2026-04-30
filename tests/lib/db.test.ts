@@ -48,4 +48,31 @@ describe('database', () => {
 		expect(tables).toHaveLength(1);
 		db.close();
 	});
+
+	it('creates indexes for common media lookups', () => {
+		const db = createDatabase(TEST_DB_PATH);
+		const indexes = db.prepare(`
+			SELECT name FROM sqlite_master
+			WHERE type = 'index' AND name IN (
+				'idx_media_category_created_at',
+				'idx_media_category_title',
+				'idx_media_metadata_media_key',
+				'idx_media_metadata_key_value_media',
+				'idx_media_tags_tag_media',
+				'idx_media_file_hash',
+				'idx_tags_category_name'
+			)
+		`).all() as { name: string }[];
+
+		expect(new Set(indexes.map((index) => index.name))).toEqual(new Set([
+			'idx_media_category_created_at',
+			'idx_media_category_title',
+			'idx_media_file_hash',
+			'idx_media_metadata_media_key',
+			'idx_media_metadata_key_value_media',
+			'idx_media_tags_tag_media',
+			'idx_tags_category_name'
+		]));
+		db.close();
+	});
 });

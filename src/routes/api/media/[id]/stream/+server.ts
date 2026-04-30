@@ -1,8 +1,10 @@
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
-import { assertSafePath } from '$lib/server/config';
+import { config, assertSafePath } from '$lib/server/config';
+import { isMediaAccessToken, verifyToken } from '$lib/server/auth';
+import { getMediaContentType } from '$lib/server/media';
+import { parseRangeHeader } from '$lib/server/http-range';
 import fs from 'fs';
-import path from 'path';
 
 function nodeToWebStream(stream: fs.ReadStream): ReadableStream {
 	let closed = false;
@@ -25,12 +27,20 @@ function nodeToWebStream(stream: fs.ReadStream): ReadableStream {
 	});
 }
 
-export const GET: RequestHandler = async ({ params, request }) => {
+export const GET: RequestHandler = async ({ params, request, url }) => {
 	const db = getDb();
 	const media = db.prepare('SELECT original_path FROM media WHERE id = ?').get(params.id) as { original_path: string } | undefined;
 
 	if (!media) {
 		return new Response('Not found', { status: 404 });
+	}
+
+	const signedToken = url.searchParams.get('token');
+	if (signedToken) {
+		const payload = verifyToken(signedToken, config.jwtSecret);
+		if (!isMediaAccessToken(payload, Number(params.id))) {
+			return new Response('Unauthorized', { status: 401 });
+		}
 	}
 
 	const filePath = media.original_path;
@@ -45,7 +55,6 @@ export const GET: RequestHandler = async ({ params, request }) => {
 
 	const stat = fs.statSync(filePath);
 	const fileSize = stat.size;
-	const ext = path.extname(filePath).toLowerCase();
 
 	// ETag based on inode, size, mtime
 	const etag = `"${stat.ino}-${stat.size}-${stat.mtimeMs.toString(36)}"`;
@@ -55,22 +64,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		return new Response(null, { status: 304 });
 	}
 
-	const mimeTypes: Record<string, string> = {
-		'.mp4': 'video/mp4',
-		'.mkv': 'video/x-matroska',
-		'.webm': 'video/webm',
-		'.avi': 'video/x-msvideo',
-		'.mov': 'video/quicktime',
-		'.mp3': 'audio/mpeg',
-		'.aac': 'audio/aac',
-		'.flac': 'audio/flac',
-		'.ogg': 'audio/ogg',
-		'.wav': 'audio/wav',
-		'.m4a': 'audio/mp4',
-		'.wma': 'audio/x-ms-wma'
-	};
-
-	const contentType = mimeTypes[ext] || 'application/octet-stream';
+	const contentType = getMediaContentType(filePath);
 	const cacheHeaders = {
 		'ETag': etag,
 		'Cache-Control': 'private, max-age=604800, immutable',
@@ -80,9 +74,18 @@ export const GET: RequestHandler = async ({ params, request }) => {
 	const range = request.headers.get('range');
 
 	if (range) {
-		const parts = range.replace(/bytes=/, '').split('-');
-		const start = parseInt(parts[0], 10);
-		const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+		const parsedRange = parseRangeHeader(range, fileSize);
+		if (!parsedRange) {
+			return new Response('Requested Range Not Satisfiable', {
+				status: 416,
+				headers: {
+					'Content-Range': `bytes */${fileSize}`,
+					'Accept-Ranges': 'bytes'
+				}
+			});
+		}
+
+		const { start, end } = parsedRange;
 		const chunkSize = end - start + 1;
 
 		return new Response(nodeToWebStream(fs.createReadStream(filePath, { start, end })), {

@@ -13,9 +13,9 @@
 	import { formatDuration } from '$lib/utils';
 
 	let { data }: { data: PageData } = $props();
-	const media = data.media;
+	let media = $derived(data.media);
 
-	const isVideo = isVideoCategory(media.category);
+	let isVideo = $derived(isVideoCategory(media.category));
 
 	let isDownloaded = $state(false);
 	let downloading = $state(false);
@@ -35,7 +35,7 @@
 	let resumeSaveInterval: ReturnType<typeof setInterval> | null = null;
 	let isPip = $state(false);
 	let showChapterPanel = $state(false);
-	const hasChapters = data.chapters.length > 0;
+	let hasChapters = $derived(data.chapters.length > 0);
 
 	// Sync seekValue from store when not seeking (audio)
 	$effect(() => {
