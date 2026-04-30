@@ -57,10 +57,17 @@
 		transcode_status: string;
 		transcode_progress: number;
 	}
-	let transcodeQueue = $state<TranscodeQueueItem[]>(
-		data.transcodeQueue.map(q => ({ id: q.id, title: q.title, transcode_status: q.transcode_status, transcode_progress: q.transcode_progress ?? 0 }))
-	);
+	let transcodeQueue = $state<TranscodeQueueItem[]>([]);
 	let transcodePolling = $state(false);
+
+	$effect(() => {
+		transcodeQueue = data.transcodeQueue.map((q) => ({
+			id: q.id,
+			title: q.title,
+			transcode_status: q.transcode_status,
+			transcode_progress: q.transcode_progress ?? 0
+		}));
+	});
 
 	async function pollTranscodeStatus() {
 		if (transcodePolling) return;

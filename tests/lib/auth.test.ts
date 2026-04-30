@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createToken, verifyToken } from '../../src/lib/server/auth';
+import { createMediaAccessToken, createToken, isMediaAccessToken, verifyToken } from '../../src/lib/server/auth';
 
 const TEST_SECRET = 'test_jwt_secret';
 
@@ -20,5 +20,14 @@ describe('auth', () => {
 		const token = createToken(TEST_SECRET, '4h');
 		const payload = verifyToken(token, TEST_SECRET);
 		expect(payload).toBeTruthy();
+	});
+
+	it('scopes media access tokens to a single media id', () => {
+		const token = createMediaAccessToken(TEST_SECRET, 42, '12h');
+		const payload = verifyToken(token, TEST_SECRET);
+
+		expect(payload).toBeTruthy();
+		expect(isMediaAccessToken(payload, 42)).toBe(true);
+		expect(isMediaAccessToken(payload, 7)).toBe(false);
 	});
 });

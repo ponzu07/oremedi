@@ -15,10 +15,11 @@
 	let groupBy = $state<GroupBy>('none');
 
 	// Reset groupBy when sub-category changes
-	let prevSub = data.currentSub;
+	let prevSub = $state<string | null>(data.currentSub ?? null);
 	$effect(() => {
-		if (data.currentSub !== prevSub) {
-			prevSub = data.currentSub;
+		const currentSub = data.currentSub ?? null;
+		if (currentSub !== prevSub) {
+			prevSub = currentSub;
 			groupBy = 'none';
 		}
 	});
@@ -72,7 +73,7 @@
 				<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">Movies</h3>
 			{/if}
 			<div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
-				{#each data.movies as movie}
+				{#each data.movies as movie (movie.id)}
 					<MediaCard
 						media={movie}
 						onPlay={() => playMedia(movie)}
@@ -89,7 +90,7 @@
 				<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">Live</h3>
 				<!-- All mode: show live in grid view -->
 				<div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
-					{#each data.liveItems as item}
+					{#each data.liveItems as item (item.id)}
 						<MediaCard
 							media={item}
 							onPlay={() => playMedia(item)}
@@ -100,16 +101,16 @@
 				</div>
 			{:else}
 				<!-- Live sub: show in list view with grouping -->
-				{#each [...liveGroups] as [groupName, items]}
+				{#each [...liveGroups] as [groupName, items] (groupName)}
 					{#if groupBy !== 'none'}
 						<h3 class="text-base-content/70 text-lg mt-6 mb-3 pb-1 border-b border-base-300">{groupName}</h3>
 					{/if}
 					<ul class="list-none p-0">
-						{#each items as item}
+						{#each items as item (item.id)}
 							<li class="flex items-center border-b border-base-300" class:bg-base-200={playerStore.state.mediaId === item.id} class:border-l-4={playerStore.state.mediaId === item.id} class:border-l-primary={playerStore.state.mediaId === item.id}>
 								<button class="flex items-center gap-4 flex-1 min-w-0 py-3 px-1 text-left cursor-pointer bg-transparent border-none active:scale-[0.98] transition-transform" onclick={() => playMedia(item)}>
 									{#if item.thumbnail_path}
-										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="w-[120px] h-[68px] object-cover rounded-lg bg-base-300 flex-shrink-0" />
+										<img src={`/api/media/${item.id}/thumbnail`} alt={item.title} class="w-[120px] h-[68px] object-cover rounded-lg bg-base-300 flex-shrink-0" loading="lazy" decoding="async" />
 									{:else}
 										<div class="w-[120px] h-[68px] bg-base-300 rounded-lg flex-shrink-0"></div>
 									{/if}

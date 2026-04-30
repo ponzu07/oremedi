@@ -2,6 +2,7 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/database';
 import { config, assertSafePath } from '$lib/server/config';
+import { isMediaAccessToken, verifyToken } from '$lib/server/auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -11,12 +12,20 @@ interface MediaRow {
 	original_path: string;
 }
 
-export const GET: RequestHandler = async ({ params }) => {
+export const GET: RequestHandler = async ({ params, url }) => {
 	const db = getDb();
 	const media = db.prepare('SELECT thumbnail_path FROM media WHERE id = ?').get(params.id) as MediaRow | undefined;
 
 	if (!media || !media.thumbnail_path || !fs.existsSync(media.thumbnail_path)) {
 		return new Response('No thumbnail', { status: 404 });
+	}
+
+	const signedToken = url.searchParams.get('token');
+	if (signedToken) {
+		const payload = verifyToken(signedToken, config.jwtSecret);
+		if (!isMediaAccessToken(payload, Number(params.id))) {
+			return new Response('Unauthorized', { status: 401 });
+		}
 	}
 
 	try { assertSafePath(media.thumbnail_path); } catch {

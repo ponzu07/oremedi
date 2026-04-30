@@ -29,7 +29,7 @@
 <div class="max-w-[960px] mx-auto p-4">
 	<PageHeader title="OreMedi" />
 
-	{#each categories as cat}
+	{#each categories as cat (cat.key)}
 		<section class="mb-8">
 			<div class="flex justify-between items-baseline mb-3">
 				<h2 class="text-lg font-bold">{cat.label}</h2>
@@ -39,7 +39,7 @@
 				<p class="text-base-content/50 text-sm">No content yet</p>
 			{:else}
 				<div class="flex gap-4 overflow-x-auto pb-2">
-					{#each cat.items as item}
+					{#each cat.items as item (item.id)}
 						<a
 							href="/play/{item.id}"
 							class="flex-shrink-0 flex flex-col gap-2 active:scale-[0.97] transition-transform"
@@ -51,6 +51,8 @@
 									src={`/api/media/${item.id}/thumbnail`}
 									alt={item.title}
 									class="object-cover bg-base-300 rounded-lg"
+									loading="lazy"
+									decoding="async"
 									class:w-40={cat.type === 'video'}
 									class:h-[90px]={cat.type === 'video'}
 									class:w-[120px]={cat.type === 'audio'}

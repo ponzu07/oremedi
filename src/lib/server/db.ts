@@ -85,6 +85,14 @@ export function createDatabase(dbPath: string): Database.Database {
 			tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
 			PRIMARY KEY (media_id, tag_id)
 		);
+
+		CREATE INDEX IF NOT EXISTS idx_media_category_created_at ON media(category, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_media_category_title ON media(category, title COLLATE NOCASE);
+		CREATE INDEX IF NOT EXISTS idx_media_file_hash ON media(file_hash);
+		CREATE INDEX IF NOT EXISTS idx_media_metadata_media_key ON media_metadata(media_id, key);
+		CREATE INDEX IF NOT EXISTS idx_media_metadata_key_value_media ON media_metadata(key, value, media_id);
+		CREATE INDEX IF NOT EXISTS idx_media_tags_tag_media ON media_tags(tag_id, media_id);
+		CREATE INDEX IF NOT EXISTS idx_tags_category_name ON tags(category, name COLLATE NOCASE);
 	`);
 
 	return db;

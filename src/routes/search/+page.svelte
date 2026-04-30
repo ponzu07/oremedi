@@ -10,7 +10,11 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let searchInput = $state(data.query);
+	let searchInput = $state('');
+
+	$effect(() => {
+		searchInput = data.query;
+	});
 
 	function doSearch() {
 		const q = searchInput.trim();
@@ -33,7 +37,6 @@
 			type="search"
 			placeholder="タイトル・タグで検索..."
 			bind:value={searchInput}
-			autofocus
 		/>
 		<button class="btn btn-primary btn-square" type="submit">
 			<Search size={20} />
@@ -45,7 +48,7 @@
 	{:else if data.results.length > 0}
 		<p class="text-xs text-base-content/50 mb-2">{data.results.length}件の結果</p>
 		<ul class="list-none p-0">
-			{#each data.results as item, i}
+			{#each data.results as item, i (item.id)}
 				<MediaListItem
 					media={item}
 					onPlay={() => playMedia(i)}

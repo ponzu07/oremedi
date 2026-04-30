@@ -19,13 +19,13 @@
 	} = $props();
 
 	let isPlaying = $derived(playerStore.state.mediaId === media.id);
-	const thumbClass = thumbnailShape === 'circle' ? 'rounded-full' : 'rounded-lg';
+	let thumbClass = $derived(thumbnailShape === 'circle' ? 'rounded-full' : 'rounded-lg');
 </script>
 
 <li class="flex items-center border-b border-base-300" class:bg-base-200={isPlaying} class:border-l-4={isPlaying} class:border-l-primary={isPlaying}>
 	<button class="flex items-center gap-3 flex-1 min-w-0 py-2 px-1 text-left cursor-pointer bg-transparent border-none active:scale-[0.98] transition-transform" onclick={onPlay}>
 		{#if media.thumbnail_path}
-			<img src={`/api/media/${media.id}/thumbnail`} alt={media.title} class="w-12 h-12 object-cover flex-shrink-0 {thumbClass}" />
+			<img src={`/api/media/${media.id}/thumbnail`} alt={media.title} class="w-12 h-12 object-cover flex-shrink-0 {thumbClass}" loading="lazy" decoding="async" />
 		{:else}
 			<div class="w-12 h-12 flex-shrink-0 flex items-center justify-center bg-base-300 text-base-content/50 {thumbClass}">
 				{placeholderText}

@@ -21,7 +21,7 @@
 	<button class="card bg-base-200 cursor-pointer text-left w-full" class:ring-2={isPlaying} class:ring-primary={isPlaying} onclick={onPlay}>
 		<figure class="aspect-video rounded-t-box overflow-hidden bg-base-300">
 			{#if media.thumbnail_path}
-				<img src={`/api/media/${media.id}/thumbnail`} alt={media.title} class="w-full h-full object-cover" />
+				<img src={`/api/media/${media.id}/thumbnail`} alt={media.title} class="w-full h-full object-cover" loading="lazy" decoding="async" />
 			{:else}
 				<div class="w-full h-full flex items-center justify-center text-2xl text-base-content/30">&#9658;</div>
 			{/if}
