@@ -10,6 +10,7 @@ describe('parseRangeHeader', () => {
 	it('parses suffix byte ranges', () => {
 		expect(parseRangeHeader('bytes=-500', 1000)).toEqual({ start: 500, end: 999 });
 		expect(parseRangeHeader('bytes=-5000', 1000)).toEqual({ start: 0, end: 999 });
+		expect(parseRangeHeader('bytes=-0', 1000)).toEqual({ start: 1000, end: 999 });
 	});
 
 	it('clamps end offsets that exceed file size', () => {

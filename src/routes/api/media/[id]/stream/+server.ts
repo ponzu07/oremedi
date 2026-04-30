@@ -87,6 +87,18 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
 
 		const { start, end } = parsedRange;
 		const chunkSize = end - start + 1;
+		if (chunkSize <= 0) {
+			return new Response(null, {
+				status: 206,
+				headers: {
+					'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+					'Accept-Ranges': 'bytes',
+					'Content-Length': '0',
+					'Content-Type': contentType,
+					...cacheHeaders
+				}
+			});
+		}
 
 		return new Response(nodeToWebStream(fs.createReadStream(filePath, { start, end })), {
 			status: 206,

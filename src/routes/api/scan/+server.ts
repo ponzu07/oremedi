@@ -20,8 +20,8 @@ async function scanDirectory(dir: string): Promise<string[]> {
 	if (!fs.existsSync(dir)) return files;
 
 	const pendingDirs = [dir];
-	for (let index = 0; index < pendingDirs.length; index++) {
-		const currentDir = pendingDirs[index];
+	for (let dirIndex = 0; dirIndex < pendingDirs.length; dirIndex++) {
+		const currentDir = pendingDirs[dirIndex];
 		const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
 		for (const entry of entries) {
 			const fullPath = path.join(currentDir, entry.name);

@@ -16,8 +16,14 @@
 
 	// Reset groupBy when sub-category changes
 	let prevSub = $state<string | null>(null);
+	let subInitialized = $state(false);
 	$effect(() => {
 		const currentSub = data.currentSub ?? null;
+		if (!subInitialized) {
+			prevSub = currentSub;
+			subInitialized = true;
+			return;
+		}
 		if (currentSub !== prevSub) {
 			prevSub = currentSub;
 			groupBy = 'none';

@@ -8,7 +8,7 @@ export function parseRangeHeader(range: string, fileSize: number): { start: numb
 
 	if (!rawStart) {
 		const suffixLength = Number(rawEnd);
-		if (!Number.isInteger(suffixLength) || suffixLength <= 0) return null;
+		if (!Number.isInteger(suffixLength) || suffixLength < 0) return null;
 		return {
 			start: Math.max(fileSize - suffixLength, 0),
 			end: fileSize - 1
