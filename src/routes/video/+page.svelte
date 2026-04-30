@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { playerStore } from '$lib/stores/player.svelte';
@@ -15,14 +16,16 @@
 	let groupBy = $state<GroupBy>('none');
 
 	// Reset groupBy when sub-category changes
-	let prevSub = $state<string | null | undefined>(undefined);
+	let prevSub = $state<string | null>(untrack(() => data.currentSub ?? null));
+	let subReady = $state(false);
 	$effect(() => {
 		const currentSub = data.currentSub ?? null;
-		if (prevSub !== undefined && currentSub !== prevSub) {
+		if (subReady && currentSub !== prevSub) {
 			prevSub = currentSub;
 			groupBy = 'none';
 			return;
 		}
+		subReady = true;
 		prevSub = currentSub;
 	});
 

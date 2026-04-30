@@ -7,6 +7,17 @@
 	let casting = $state(false);
 	let connecting = $state(false);
 
+	interface CastUrlResponse {
+		url: string;
+		contentType: string;
+	}
+
+	function isCastUrlResponse(value: unknown): value is CastUrlResponse {
+		if (typeof value !== 'object' || value === null) return false;
+		const body = value as Record<string, unknown>;
+		return typeof body.url === 'string' && typeof body.contentType === 'string';
+	}
+
 	// Initialize Cast SDK
 	$effect(() => {
 		const initCast = () => {
@@ -62,8 +73,8 @@
 			if (!res.ok) {
 				throw new Error('cast-url request failed');
 			}
-			const body = await res.json() as { url?: unknown; contentType?: unknown };
-			if (typeof body.url !== 'string' || typeof body.contentType !== 'string') {
+			const body = await res.json() as unknown;
+			if (!isCastUrlResponse(body)) {
 				throw new Error('Failed to load media information for casting');
 			}
 
