@@ -15,19 +15,15 @@
 	let groupBy = $state<GroupBy>('none');
 
 	// Reset groupBy when sub-category changes
-	let prevSub = $state<string | null>(null);
-	let subInitialized = $state(false);
+	let prevSub = $state<string | null | undefined>(undefined);
 	$effect(() => {
 		const currentSub = data.currentSub ?? null;
-		if (!subInitialized) {
-			prevSub = currentSub;
-			subInitialized = true;
-			return;
-		}
-		if (currentSub !== prevSub) {
+		if (prevSub !== undefined && currentSub !== prevSub) {
 			prevSub = currentSub;
 			groupBy = 'none';
+			return;
 		}
+		prevSub = currentSub;
 	});
 
 	let liveGroups = $derived(getGroups(data.liveItems, groupBy));

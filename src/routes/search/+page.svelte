@@ -11,13 +11,9 @@
 	let { data }: { data: PageData } = $props();
 
 	let searchInput = $state('');
-	let lastSyncedQuery = $state<string | null>(null);
 
 	$effect(() => {
-		if (data.query !== lastSyncedQuery) {
-			searchInput = data.query;
-			lastSyncedQuery = data.query;
-		}
+		searchInput = data.query;
 	});
 
 	function doSearch() {
