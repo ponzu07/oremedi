@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { playerStore } from '$lib/stores/player.svelte';
@@ -10,7 +11,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let searchInput = $state('');
+	let searchInput = $state(untrack(() => data.query));
 
 	$effect(() => {
 		searchInput = data.query;
