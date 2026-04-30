@@ -64,7 +64,7 @@
 			}
 			const body = await res.json() as { url?: unknown; contentType?: unknown };
 			if (typeof body.url !== 'string' || typeof body.contentType !== 'string') {
-				throw new Error('invalid cast-url response: expected url and contentType to be strings');
+				throw new Error('Failed to load media information for casting');
 			}
 
 			const mediaInfo = new chrome.cast.media.MediaInfo(body.url, body.contentType);
