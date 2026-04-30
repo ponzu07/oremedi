@@ -30,4 +30,13 @@ describe('auth', () => {
 		expect(isMediaAccessToken(payload, 42)).toBe(true);
 		expect(isMediaAccessToken(payload, 7)).toBe(false);
 	});
+
+	it('rejects invalid media ids for media access tokens', () => {
+		expect(() => createMediaAccessToken(TEST_SECRET, 0)).toThrow('mediaId must be a positive integer');
+		expect(() => createMediaAccessToken(TEST_SECRET, -1)).toThrow('mediaId must be a positive integer');
+	});
+
+	it('propagates invalid expiry errors for media access tokens', () => {
+		expect(() => createMediaAccessToken(TEST_SECRET, 42, 'not-a-duration')).toThrow();
+	});
 });

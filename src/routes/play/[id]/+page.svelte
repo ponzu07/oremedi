@@ -15,7 +15,7 @@
 	let { data }: { data: PageData } = $props();
 	let media = $derived(data.media);
 
-	const isVideo = isVideoCategory(media.category);
+	let isVideo = $derived(isVideoCategory(media.category));
 
 	let isDownloaded = $state(false);
 	let downloading = $state(false);

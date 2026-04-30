@@ -17,6 +17,10 @@ export function createToken(
 }
 
 export function createMediaAccessToken(secret: string, mediaId: number, expiresIn: string = '12h'): string {
+	if (!Number.isInteger(mediaId) || mediaId <= 0) {
+		throw new Error('mediaId must be a positive integer');
+	}
+
 	return createToken(secret, expiresIn, { scope: 'media-access', mediaId });
 }
 
