@@ -1,4 +1,4 @@
-FROM node:22-slim AS builder
+FROM node:26-slim AS builder
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -6,7 +6,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-slim
+FROM node:26-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libva2 libva-drm2 mesa-va-drivers gosu && rm -rf /var/lib/apt/lists/*
 
