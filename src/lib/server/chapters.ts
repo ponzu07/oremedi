@@ -32,15 +32,31 @@ export function extractChapters(filePath: string): Chapter[] {
 }
 
 export function saveChapters(db: Database.Database, mediaId: number, chapters: Chapter[]) {
-	db.prepare('DELETE FROM media_chapters WHERE media_id = ?').run(mediaId);
-	if (chapters.length === 0) return;
-
 	const insert = db.prepare(
 		'INSERT INTO media_chapters (media_id, start_time, end_time, title) VALUES (?, ?, ?, ?)'
 	);
-	for (const ch of chapters) {
-		insert.run(mediaId, ch.start_time, ch.end_time, ch.title);
-	}
+	// Delete + insert atomically so a mid-write failure cannot leave the media
+	// with its chapters wiped.
+	const replace = db.transaction((rows: Chapter[]) => {
+		db.prepare('DELETE FROM media_chapters WHERE media_id = ?').run(mediaId);
+		for (const ch of rows) {
+			insert.run(mediaId, ch.start_time, ch.end_time, ch.title);
+		}
+	});
+	replace(chapters);
+}
+
+export function isValidChapterArray(value: unknown): value is Chapter[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(c) =>
+				c && typeof c === 'object' &&
+				typeof (c as Chapter).start_time === 'number' &&
+				typeof (c as Chapter).end_time === 'number' &&
+				typeof (c as Chapter).title === 'string'
+		)
+	);
 }
 
 export function getChapters(db: Database.Database, mediaId: number): Chapter[] {

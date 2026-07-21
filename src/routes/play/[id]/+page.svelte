@@ -7,7 +7,7 @@
 	import { AlertCircle, RefreshCw } from 'lucide-svelte';
 	import {
 		downloadMedia,
-		getDownloadedMedia
+		isDownloaded as checkDownloaded
 	} from '$lib/download-manager';
 	import { categoryLabels } from '$lib/constants';
 	import { formatDuration } from '$lib/utils';
@@ -148,11 +148,8 @@
 			}
 		}
 
-		// Check if already downloaded
-		const existing = await getDownloadedMedia(media.id);
-		if (existing) {
-			isDownloaded = true;
-		}
+		// Check if already downloaded (metadata-only, no file reassembly)
+		isDownloaded = await checkDownloaded(media.id);
 	});
 
 	onDestroy(() => {
@@ -294,6 +291,7 @@
 	<div
 		class="vp-overlay"
 		class:vp-overlay-visible={controlsVisible}
+		inert={!controlsVisible}
 		onclick={onOverlayClick}
 	>
 		<!-- Top bar -->

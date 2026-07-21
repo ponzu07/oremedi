@@ -5,6 +5,7 @@
 		removeDownload,
 		getStorageEstimate,
 		requestPersistentStorage,
+		sweepOrphanChunks,
 		formatSize,
 		type DownloadStatus
 	} from '$lib/download-manager';
@@ -21,7 +22,11 @@
 	let isOffline = $state(!navigator.onLine);
 
 	onMount(() => {
-		listDownloads().then(d => downloads = d);
+		// Reclaim chunks left behind by old interrupted downloads, then refresh.
+		sweepOrphanChunks()
+			.catch(() => {})
+			.then(() => listDownloads())
+			.then(d => downloads = d);
 		getStorageEstimate().then(s => storage = s);
 		requestPersistentStorage().then(p => persistent = p);
 

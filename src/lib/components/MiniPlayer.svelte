@@ -37,6 +37,19 @@
 		playerStore.seek(ratio * ps.duration);
 	}
 
+	function handleSeekKey(e: KeyboardEvent) {
+		const dur = ps.duration;
+		if (!dur) return;
+		let t = ps.currentTime;
+		if (e.key === 'ArrowRight') t = Math.min(dur, t + 5);
+		else if (e.key === 'ArrowLeft') t = Math.max(0, t - 5);
+		else if (e.key === 'Home') t = 0;
+		else if (e.key === 'End') t = dur;
+		else return;
+		e.preventDefault();
+		playerStore.seek(t);
+	}
+
 	// Speed button long press
 	let speedTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -69,11 +82,12 @@
 			onpointerdown={handleSeekStart}
 			onpointermove={handleSeekMove}
 			onpointerup={handleSeekEnd}
+			onkeydown={handleSeekKey}
 			role="slider"
 			aria-label="Seek"
-			aria-valuenow={ps.currentTime}
+			aria-valuenow={Math.round(ps.currentTime)}
 			aria-valuemin={0}
-			aria-valuemax={ps.duration}
+			aria-valuemax={Math.round(ps.duration)}
 			tabindex="0"
 		>
 			<div class="seekbar-track">

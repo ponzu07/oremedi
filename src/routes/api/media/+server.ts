@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
 import { assertSafePath } from '$lib/server/config';
+import { isValidCategory } from '$lib/media-types';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const db = getDb();
@@ -52,6 +53,10 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	if (!title || !category || !original_path) {
 		return json({ error: 'title, category, and original_path are required' }, { status: 400 });
+	}
+
+	if (!isValidCategory(category)) {
+		return json({ error: `Invalid category: ${category}` }, { status: 400 });
 	}
 
 	try { assertSafePath(String(original_path)); } catch {

@@ -1,29 +1,9 @@
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
 import { assertSafePath } from '$lib/server/config';
+import { fileWebStream } from '$lib/server/streaming';
+import { extname } from '$lib/media-types';
 import fs from 'fs';
-import path from 'path';
-
-function nodeToWebStream(stream: fs.ReadStream): ReadableStream {
-	let closed = false;
-	return new ReadableStream({
-		start(controller) {
-			stream.on('data', (chunk) => {
-				if (!closed) controller.enqueue(chunk);
-			});
-			stream.on('end', () => {
-				if (!closed) { closed = true; controller.close(); }
-			});
-			stream.on('error', (err) => {
-				if (!closed) { closed = true; controller.error(err); }
-			});
-		},
-		cancel() {
-			closed = true;
-			stream.destroy();
-		}
-	});
-}
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
@@ -37,20 +17,20 @@ export const GET: RequestHandler = async ({ params }) => {
 		return new Response('Forbidden', { status: 403 });
 	}
 
-	if (!fs.existsSync(media.original_path)) {
+	let stat: fs.Stats;
+	try {
+		stat = fs.statSync(media.original_path);
+	} catch {
 		return new Response('File not found', { status: 404 });
 	}
 
-	const stat = fs.statSync(media.original_path);
-	const ext = path.extname(media.original_path);
-	const fileName = `${media.title}${ext}`;
-
+	const fileName = `${media.title}${extname(media.original_path)}`;
 	const etag = `"${stat.ino}-${stat.size}-${stat.mtimeMs.toString(36)}"`;
 
-	return new Response(nodeToWebStream(fs.createReadStream(media.original_path)), {
+	return new Response(fileWebStream(media.original_path), {
 		headers: {
 			'Content-Type': 'application/octet-stream',
-			'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+			'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
 			'Content-Length': String(stat.size),
 			'ETag': etag,
 			'Cache-Control': 'private, max-age=604800'

@@ -19,7 +19,11 @@ export function setAuthCookie(cookies: Cookies): void {
 
 export function verifyToken(token: string, secret: string): { authenticated: boolean } | null {
 	try {
-		return jwt.verify(token, secret) as { authenticated: boolean };
+		const payload = jwt.verify(token, secret) as { authenticated?: unknown };
+		// Only accept tokens we actually issued (authenticated === true), not any
+		// validly-signed JWT that happens to omit or falsify the claim.
+		if (payload?.authenticated !== true) return null;
+		return { authenticated: true };
 	} catch {
 		return null;
 	}

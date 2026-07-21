@@ -18,6 +18,8 @@ if [ "$PUID" != "0" ]; then
         USER_NAME="appuser"
     fi
 
+    # Only /app and /data are chowned. Bind-mounted media (/media, /media-originals)
+    # is NOT chowned — set its host ownership to match PUID/PGID (see README).
     chown -R "$PUID:$PGID" /app /data 2>/dev/null || true
 
     exec gosu "$USER_NAME" node build

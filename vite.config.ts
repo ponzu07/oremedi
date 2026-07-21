@@ -35,7 +35,7 @@ export default defineConfig({
 				runtimeCaching: [
 					{
 						urlPattern: /^\/api\/media\/\d+\/thumbnail/,
-						handler: 'CacheFirst',
+						handler: 'StaleWhileRevalidate',
 						options: {
 							cacheName: 'thumbnails',
 							expiration: { maxEntries: 200, maxAgeSeconds: 86400 }

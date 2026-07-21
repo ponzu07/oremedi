@@ -1,6 +1,20 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
+import { assertSafePath } from '$lib/server/config';
+import { isValidCategory } from '$lib/media-types';
+import fs from 'fs';
+
+/** Best-effort delete of a media-owned file, guarded against path traversal. */
+function safeUnlink(filePath: string | null | undefined) {
+	if (!filePath) return;
+	try {
+		assertSafePath(filePath);
+		fs.rmSync(filePath, { force: true });
+	} catch {
+		/* outside allowed dirs or already gone — ignore */
+	}
+}
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
@@ -30,6 +44,10 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		return json({ error: 'Invalid request body' }, { status: 400 });
 	}
 	const { title, category, duration, metadata, tags } = body;
+
+	if (category != null && !isValidCategory(category)) {
+		return json({ error: `Invalid category: ${category}` }, { status: 400 });
+	}
 
 	const existing = db.prepare('SELECT id FROM media WHERE id = ?').get(params.id);
 	if (!existing) {
@@ -89,12 +107,18 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
 export const DELETE: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const existing = db.prepare('SELECT id FROM media WHERE id = ?').get(params.id);
+	const existing = db.prepare('SELECT original_path, thumbnail_path FROM media WHERE id = ?')
+		.get(params.id) as { original_path: string; thumbnail_path: string | null } | undefined;
 
 	if (!existing) {
 		return json({ error: 'Not found' }, { status: 404 });
 	}
 
 	db.prepare('DELETE FROM media WHERE id = ?').run(params.id);
+
+	// Reclaim the on-disk files owned by this media (exact stored paths only).
+	safeUnlink(existing.original_path);
+	safeUnlink(existing.thumbnail_path);
+
 	return json({ success: true });
 };

@@ -6,15 +6,28 @@
 
 	// Initialize Cast SDK
 	$effect(() => {
+		let sessionListener: ((event: any) => void) | null = null;
+
 		const initCast = () => {
 			const cast = (window as any).cast;
 			const chrome = (window as any).chrome;
 			if (!cast || !chrome?.cast) return;
 
-			cast.framework.CastContext.getInstance().setOptions({
+			const context = cast.framework.CastContext.getInstance();
+			context.setOptions({
 				receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
 				autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
 			});
+
+			// Keep local `casting` in sync with the real Cast session, including
+			// sessions ended/resumed outside this button (e.g. the Cast dialog).
+			const S = cast.framework.SessionState;
+			sessionListener = (event: any) => {
+				casting = event.sessionState === S.SESSION_STARTED || event.sessionState === S.SESSION_RESUMED;
+			};
+			context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, sessionListener);
+			// Reflect an already-active session on mount.
+			casting = !!context.getCurrentSession();
 
 			castAvailable = true;
 		};
@@ -39,6 +52,19 @@
 			script.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
 			document.head.appendChild(script);
 		}
+
+		return () => {
+			if (sessionListener) {
+				const cast = (window as any).cast;
+				try {
+					cast?.framework.CastContext.getInstance().removeEventListener(
+						cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+						sessionListener
+					);
+				} catch { /* SDK gone — ignore */ }
+				sessionListener = null;
+			}
+		};
 	});
 
 	async function startCast() {

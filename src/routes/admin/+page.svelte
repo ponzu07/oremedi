@@ -3,6 +3,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { categoryLabels } from '$lib/constants';
 	import { logout } from '$lib/utils';
+	import { formatSize as formatFileSize } from '$lib/download-manager';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { RefreshCw, Plus, X, Pencil, Trash2, RotateCcw, LogOut, Tag, ChevronDown, ChevronUp, Upload } from 'lucide-svelte';
 
@@ -128,13 +129,6 @@
 
 	function removeFile(index: number) {
 		uploadFiles = uploadFiles.filter((_, i) => i !== index);
-	}
-
-	function formatFileSize(bytes: number): string {
-		if (bytes < 1024) return `${bytes} B`;
-		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-		if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-		return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 	}
 
 	async function uploadAll() {

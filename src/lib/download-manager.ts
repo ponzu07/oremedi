@@ -68,6 +68,17 @@ function putChunk(db: IDBDatabase, key: string, data: Blob): Promise<void> {
 	});
 }
 
+/** Delete every chunk belonging to a media id (keys `${id}_0`, `${id}_1`, …). */
+function clearChunksFor(db: IDBDatabase, mediaId: number): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const tx = db.transaction(CHUNK_STORE, 'readwrite');
+		const range = IDBKeyRange.bound(`${mediaId}_`, `${mediaId}_￿`);
+		tx.objectStore(CHUNK_STORE).delete(range);
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+}
+
 export async function downloadMedia(
 	mediaId: number,
 	title: string,
@@ -84,53 +95,102 @@ export async function downloadMedia(
 
 	const db = await openDB();
 
+	// Remove any leftovers from a previous interrupted attempt so a partial
+	// download can't accumulate orphaned chunks under the same id.
+	await removeDownload(mediaId);
+
 	// Stream to IndexedDB in chunks — no large buffer accumulation
 	let loaded = 0;
 	let chunkIndex = 0;
 	let pending: BlobPart[] = [];
 	let pendingSize = 0;
 
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
 
-		pending.push(value);
-		pendingSize += value.length;
-		loaded += value.length;
-		onProgress?.(loaded, contentLength);
+			pending.push(value);
+			pendingSize += value.length;
+			loaded += value.length;
+			onProgress?.(loaded, contentLength);
 
-		// Flush when accumulated enough
-		if (pendingSize >= CHUNK_SIZE) {
+			// Flush when accumulated enough
+			if (pendingSize >= CHUNK_SIZE) {
+				const blob = new Blob(pending, { type: 'application/octet-stream' });
+				await putChunk(db, `${mediaId}_${chunkIndex}`, blob);
+				pending = [];
+				pendingSize = 0;
+				chunkIndex++;
+			}
+		}
+
+		// Write remaining
+		if (pendingSize > 0) {
 			const blob = new Blob(pending, { type: 'application/octet-stream' });
 			await putChunk(db, `${mediaId}_${chunkIndex}`, blob);
-			pending = [];
-			pendingSize = 0;
 			chunkIndex++;
 		}
-	}
+		pending = []; // free memory
 
-	// Write remaining
-	if (pendingSize > 0) {
-		const blob = new Blob(pending, { type: 'application/octet-stream' });
-		await putChunk(db, `${mediaId}_${chunkIndex}`, blob);
-		chunkIndex++;
-	}
-	pending = []; // free memory
+		// Write metadata last — its presence is what marks the download complete.
+		const meta: DownloadMeta = {
+			id: mediaId,
+			title,
+			category,
+			contentType,
+			totalSize: loaded,
+			chunkCount: chunkIndex,
+			downloadedAt: new Date().toISOString()
+		};
 
-	// Write metadata
-	const meta: DownloadMeta = {
-		id: mediaId,
-		title,
-		category,
-		contentType,
-		totalSize: loaded,
-		chunkCount: chunkIndex,
-		downloadedAt: new Date().toISOString()
-	};
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction(META_STORE, 'readwrite');
+			tx.objectStore(META_STORE).put(meta);
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+		});
+	} catch (err) {
+		// Reclaim any chunks written before the failure (no meta was committed).
+		await clearChunksFor(db, mediaId).catch(() => {});
+		throw err;
+	}
+}
+
+/** Cheap check for whether a completed download exists (reads only metadata). */
+export async function isDownloaded(mediaId: number): Promise<boolean> {
+	const db = await openDB();
+	const meta = await new Promise<DownloadMeta | undefined>((resolve, reject) => {
+		const tx = db.transaction(META_STORE, 'readonly');
+		const req = tx.objectStore(META_STORE).get(mediaId);
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+	return !!meta?.chunkCount;
+}
+
+/** Delete chunks that have no corresponding metadata (leftovers from old interrupted downloads). */
+export async function sweepOrphanChunks(): Promise<void> {
+	const db = await openDB();
+	const metaIds = await new Promise<Set<number>>((resolve, reject) => {
+		const tx = db.transaction(META_STORE, 'readonly');
+		const req = tx.objectStore(META_STORE).getAllKeys();
+		req.onsuccess = () => resolve(new Set(req.result as number[]));
+		req.onerror = () => reject(req.error);
+	});
 
 	await new Promise<void>((resolve, reject) => {
-		const tx = db.transaction(META_STORE, 'readwrite');
-		tx.objectStore(META_STORE).put(meta);
+		const tx = db.transaction(CHUNK_STORE, 'readwrite');
+		const store = tx.objectStore(CHUNK_STORE);
+		const cursorReq = store.openKeyCursor();
+		cursorReq.onsuccess = () => {
+			const cursor = cursorReq.result;
+			if (!cursor) return;
+			const key = String(cursor.key);
+			const id = Number(key.slice(0, key.indexOf('_')));
+			if (!metaIds.has(id)) store.delete(cursor.key);
+			cursor.continue();
+		};
 		tx.oncomplete = () => resolve();
 		tx.onerror = () => reject(tx.error);
 	});
@@ -192,23 +252,9 @@ export async function listDownloads(): Promise<DownloadEntry[]> {
 export async function removeDownload(mediaId: number): Promise<void> {
 	const db = await openDB();
 
-	const meta = await new Promise<DownloadMeta | undefined>((resolve, reject) => {
-		const tx = db.transaction(META_STORE, 'readonly');
-		const req = tx.objectStore(META_STORE).get(mediaId);
-		req.onsuccess = () => resolve(req.result);
-		req.onerror = () => reject(req.error);
-	});
-
-	if (meta?.chunkCount) {
-		for (let i = 0; i < meta.chunkCount; i++) {
-			await new Promise<void>((resolve, reject) => {
-				const tx = db.transaction(CHUNK_STORE, 'readwrite');
-				tx.objectStore(CHUNK_STORE).delete(`${mediaId}_${i}`);
-				tx.oncomplete = () => resolve();
-				tx.onerror = () => reject(tx.error);
-			});
-		}
-	}
+	// Range-delete all chunks for this id (robust against partial downloads
+	// whose recorded chunkCount may be missing or stale), then drop the metadata.
+	await clearChunksFor(db, mediaId);
 
 	await new Promise<void>((resolve, reject) => {
 		const tx = db.transaction(META_STORE, 'readwrite');
@@ -219,9 +265,9 @@ export async function removeDownload(mediaId: number): Promise<void> {
 }
 
 export function formatSize(bytes: number): string {
-	if (bytes === 0) return '0 B';
+	if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
 	const k = 1024;
-	const sizes = ['B', 'KB', 'MB', 'GB'];
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
+	const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+	const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
 	return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }

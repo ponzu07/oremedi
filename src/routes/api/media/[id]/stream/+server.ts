@@ -1,29 +1,9 @@
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
 import { assertSafePath } from '$lib/server/config';
+import { fileWebStream, parseRange } from '$lib/server/streaming';
+import { mimeTypeForFile } from '$lib/media-types';
 import fs from 'fs';
-import path from 'path';
-
-function nodeToWebStream(stream: fs.ReadStream): ReadableStream {
-	let closed = false;
-	return new ReadableStream({
-		start(controller) {
-			stream.on('data', (chunk) => {
-				if (!closed) controller.enqueue(chunk);
-			});
-			stream.on('end', () => {
-				if (!closed) { closed = true; controller.close(); }
-			});
-			stream.on('error', (err) => {
-				if (!closed) { closed = true; controller.error(err); }
-			});
-		},
-		cancel() {
-			closed = true;
-			stream.destroy();
-		}
-	});
-}
 
 export const GET: RequestHandler = async ({ params, request }) => {
 	const db = getDb();
@@ -39,13 +19,14 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		return new Response('Forbidden', { status: 403 });
 	}
 
-	if (!fs.existsSync(filePath)) {
+	let stat: fs.Stats;
+	try {
+		stat = fs.statSync(filePath);
+	} catch {
 		return new Response('File not found', { status: 404 });
 	}
 
-	const stat = fs.statSync(filePath);
 	const fileSize = stat.size;
-	const ext = path.extname(filePath).toLowerCase();
 
 	// ETag based on inode, size, mtime
 	const etag = `"${stat.ino}-${stat.size}-${stat.mtimeMs.toString(36)}"`;
@@ -55,40 +36,32 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		return new Response(null, { status: 304 });
 	}
 
-	const mimeTypes: Record<string, string> = {
-		'.mp4': 'video/mp4',
-		'.mkv': 'video/x-matroska',
-		'.webm': 'video/webm',
-		'.avi': 'video/x-msvideo',
-		'.mov': 'video/quicktime',
-		'.mp3': 'audio/mpeg',
-		'.aac': 'audio/aac',
-		'.flac': 'audio/flac',
-		'.ogg': 'audio/ogg',
-		'.wav': 'audio/wav',
-		'.m4a': 'audio/mp4',
-		'.wma': 'audio/x-ms-wma'
-	};
-
-	const contentType = mimeTypes[ext] || 'application/octet-stream';
+	const contentType = mimeTypeForFile(filePath);
+	// Media bytes change after (re)transcode while the URL stays the same, so
+	// allow caching but force revalidation against the ETag rather than serving
+	// an immutable copy for days.
 	const cacheHeaders = {
 		'ETag': etag,
-		'Cache-Control': 'private, max-age=604800, immutable',
+		'Cache-Control': 'private, no-cache',
 		'Last-Modified': stat.mtime.toUTCString()
 	};
 
-	const range = request.headers.get('range');
+	const range = parseRange(request.headers.get('range'), fileSize);
+
+	// Malformed or unsatisfiable range → 416
+	if (range === null) {
+		return new Response('Range Not Satisfiable', {
+			status: 416,
+			headers: { 'Content-Range': `bytes */${fileSize}`, 'Accept-Ranges': 'bytes' }
+		});
+	}
 
 	if (range) {
-		const parts = range.replace(/bytes=/, '').split('-');
-		const start = parseInt(parts[0], 10);
-		const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-		const chunkSize = end - start + 1;
-
-		return new Response(nodeToWebStream(fs.createReadStream(filePath, { start, end })), {
+		const chunkSize = range.end - range.start + 1;
+		return new Response(fileWebStream(filePath, { start: range.start, end: range.end }), {
 			status: 206,
 			headers: {
-				'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+				'Content-Range': `bytes ${range.start}-${range.end}/${fileSize}`,
 				'Accept-Ranges': 'bytes',
 				'Content-Length': String(chunkSize),
 				'Content-Type': contentType,
@@ -97,7 +70,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		});
 	}
 
-	return new Response(nodeToWebStream(fs.createReadStream(filePath)), {
+	return new Response(fileWebStream(filePath), {
 		headers: {
 			'Content-Length': String(fileSize),
 			'Content-Type': contentType,

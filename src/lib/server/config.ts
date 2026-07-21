@@ -6,6 +6,9 @@ const jwtSecret = env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 if (!env.JWT_SECRET) {
 	console.warn('[config] JWT_SECRET not set — using random secret (tokens will invalidate on restart)');
 }
+if (!env.PASSWORD) {
+	console.warn('[config] PASSWORD not set — login is disabled until you configure one');
+}
 
 export const config = {
 	password: env.PASSWORD ?? '',

@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getDb } from '$lib/server/database';
-import { getChapters, saveChapters, type Chapter } from '$lib/server/chapters';
+import { getChapters, saveChapters, isValidChapterArray, type Chapter } from '$lib/server/chapters';
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
@@ -18,11 +18,15 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		return json({ error: 'Not found' }, { status: 404 });
 	}
 
-	let chapters: Chapter[];
+	let chapters: unknown;
 	try { chapters = await request.json(); } catch {
 		return json({ error: 'Invalid request body' }, { status: 400 });
 	}
-	saveChapters(db, mediaId, chapters);
+	// Validate BEFORE touching the DB so a malformed body cannot wipe existing chapters.
+	if (!isValidChapterArray(chapters)) {
+		return json({ error: 'Expected an array of { start_time, end_time, title }' }, { status: 400 });
+	}
+	saveChapters(db, mediaId, chapters as Chapter[]);
 
 	return json({ success: true, chapters: getChapters(db, mediaId) });
 };

@@ -50,16 +50,16 @@ interface MediaRow {
 	title: string;
 }
 
-interface ProbeResult {
+export interface ProbeResult {
 	video_codec: string | null;
 	audio_codec: string | null;
 	container: string;
 }
 
-type TranscodeAction = 'skip' | 'remux' | 'transcode';
+export type TranscodeAction = 'skip' | 'remux' | 'transcode';
 type HwAccel = 'vaapi' | 'none';
 
-function probeCodecs(filePath: string): ProbeResult {
+export function probeCodecs(filePath: string): ProbeResult {
 	try {
 		const result = execFileSync('ffprobe', [
 			'-v', 'error', '-show_entries', 'stream=codec_name,codec_type',
@@ -80,7 +80,7 @@ function probeCodecs(filePath: string): ProbeResult {
 	}
 }
 
-function decideAction(probe: ProbeResult): TranscodeAction {
+export function decideAction(probe: ProbeResult): TranscodeAction {
 	const videoOk = !probe.video_codec || COMPATIBLE_VIDEO_CODECS.has(probe.video_codec);
 	const audioOk = !probe.audio_codec || COMPATIBLE_AUDIO_CODECS.has(probe.audio_codec);
 
@@ -204,10 +204,21 @@ function runFfmpeg(
 	});
 }
 
+function fileSizeOf(filePath: string): number | null {
+	try { return fs.statSync(filePath).size; } catch { return null; }
+}
+
+function cleanupTemp(tempPath: string) {
+	if (tempPath) {
+		try { fs.rmSync(tempPath, { force: true }); } catch { /* ignore */ }
+	}
+}
+
 function finishMedia(
 	db: Database.Database,
 	mediaId: number,
-	outputPath: string,
+	tempOutputPath: string,
+	finalOutputPath: string,
 	originalPath: string,
 	mediaPath: string,
 	originalsPath: string,
@@ -215,6 +226,13 @@ function finishMedia(
 	duration: number | null,
 	callback: () => void
 ) {
+	// Honor a cancel that raced in while ffmpeg was finishing successfully.
+	if (isCancelled(db, mediaId)) {
+		cleanupTemp(tempOutputPath);
+		callback();
+		return;
+	}
+
 	try {
 		const chapters = extractChapters(originalPath);
 		if (chapters.length > 0) saveChapters(db, mediaId, chapters);
@@ -234,12 +252,22 @@ function finishMedia(
 			}
 		}
 
-		const newHash = computeFileHash(outputPath);
+		// The original path is now free — promote the temp output into its final
+		// place. (When source and output share a name, e.g. an .mp4 that needed a
+		// re-encode, this is what lets us avoid ffmpeg reading and writing the
+		// same file.)
+		if (tempOutputPath !== finalOutputPath) {
+			fs.renameSync(tempOutputPath, finalOutputPath);
+		}
+
+		const newHash = computeFileHash(finalOutputPath);
+		const newSize = fileSizeOf(finalOutputPath);
 		db.prepare(
-			"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, updated_at = datetime('now') WHERE id = ?"
-		).run(outputPath, thumbPath, duration ? Math.round(duration) : null, newHash, mediaId);
+			"UPDATE media SET transcode_status = 'ready', transcode_progress = 100, original_path = ?, thumbnail_path = ?, duration = ?, file_hash = ?, file_size = ?, updated_at = datetime('now') WHERE id = ?"
+		).run(finalOutputPath, thumbPath, duration ? Math.round(duration) : null, newHash, newSize, mediaId);
 	} catch (e) {
 		console.error(`[transcoder] finishMedia failed for media ${mediaId}:`, (e as Error).message);
+		cleanupTemp(tempOutputPath);
 		db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(mediaId);
 	}
 
@@ -286,15 +314,17 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 				const args = ['-i', next.original_path, '-c:a', 'aac', '-b:a', '192k', '-y', outputPath];
 				runFfmpeg(args, db, next.id, totalDuration, (code) => {
 					if (code === 0) {
-						finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, null, totalDuration, () => {
+						finishMedia(db, next.id, outputPath, outputPath, next.original_path, mediaPath, originalsPath, null, totalDuration, () => {
 							console.log(`[transcoder] Done (audio): "${next.title}"`);
 							setTimeout(processNext, 1000);
 						});
 					} else if (!isCancelled(db, next.id)) {
+						cleanupTemp(outputPath);
 						db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 						console.error(`[transcoder] Failed (audio): "${next.title}"`);
 						setTimeout(processNext, 5000);
 					} else {
+						cleanupTemp(outputPath);
 						console.log(`[transcoder] Cancelled (audio): "${next.title}"`);
 						setTimeout(processNext, 1000);
 					}
@@ -308,6 +338,10 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 		const action = decideAction(probe);
 		const totalDuration = getDuration(next.original_path);
 		const thumbPath = path.join(fileDir, `${baseName}-thumb.jpg`);
+		const finalOutput = path.join(fileDir, `${baseName}.mp4`);
+		// Encode to a distinct temp file first so we never read+write the same
+		// path (an .mp4 source that needs a re-encode would otherwise collide).
+		const tempOutput = path.join(fileDir, `${baseName}.oremedi-tmp.mp4`);
 
 		console.log(`[transcoder] "${next.title}" — ${probe.video_codec}/${probe.audio_codec} in ${probe.container} → ${action}`);
 
@@ -327,34 +361,38 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 
 		if (action === 'remux') {
 			// Compatible codecs, just need container change → fast copy
-			const outputPath = path.join(fileDir, `${baseName}.mp4`);
-			const args = ['-i', next.original_path, '-c', 'copy', '-movflags', '+faststart', '-y', outputPath];
+			const args = ['-i', next.original_path, '-c', 'copy', '-movflags', '+faststart', '-y', tempOutput];
 			runFfmpeg(args, db, next.id, totalDuration, (code) => {
 				if (code === 0) {
 					generateThumbnail(next.original_path, thumbPath, totalDuration, () => {
-						finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
+						finishMedia(db, next.id, tempOutput, finalOutput, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
 							console.log(`[transcoder] Remuxed: "${next.title}"`);
 							setTimeout(processNext, 1000);
 						});
 					});
+				} else if (isCancelled(db, next.id)) {
+					cleanupTemp(tempOutput);
+					console.log(`[transcoder] Cancelled (remux): "${next.title}"`);
+					setTimeout(processNext, 1000);
 				} else {
 					// Remux failed, fall through to full transcode
+					cleanupTemp(tempOutput);
 					console.warn(`[transcoder] Remux failed for "${next.title}", falling back to transcode`);
-					doFullTranscode(db, next, outputPath, thumbPath, totalDuration, mediaPath, originalsPath, hwAccel, () => setTimeout(processNext, 1000));
+					doFullTranscode(db, next, tempOutput, finalOutput, thumbPath, totalDuration, mediaPath, originalsPath, hwAccel, () => setTimeout(processNext, 1000));
 				}
 			});
 			return;
 		}
 
 		// action === 'transcode'
-		const outputPath = path.join(fileDir, `${baseName}.mp4`);
-		doFullTranscode(db, next, outputPath, thumbPath, totalDuration, mediaPath, originalsPath, hwAccel, () => setTimeout(processNext, 1000));
+		doFullTranscode(db, next, tempOutput, finalOutput, thumbPath, totalDuration, mediaPath, originalsPath, hwAccel, () => setTimeout(processNext, 1000));
 	};
 
 	function doFullTranscode(
 		db: Database.Database,
 		next: MediaRow,
-		outputPath: string,
+		tempOutput: string,
+		finalOutput: string,
 		thumbPath: string,
 		totalDuration: number | null,
 		mediaPath: string,
@@ -362,45 +400,50 @@ export function startTranscodeWorker(db: Database.Database, mediaPath: string, o
 		hwAccel: HwAccel,
 		done: () => void
 	) {
-		const args = buildVideoArgs(next.original_path, outputPath, hwAccel);
+		const args = buildVideoArgs(next.original_path, tempOutput, hwAccel);
 		db.prepare("UPDATE media SET transcode_progress = 0 WHERE id = ?").run(next.id);
 
 		runFfmpeg(args, db, next.id, totalDuration, (code) => {
 			if (code === 0) {
 				generateThumbnail(next.original_path, thumbPath, totalDuration, () => {
-					finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
+					finishMedia(db, next.id, tempOutput, finalOutput, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
 						console.log(`[transcoder] Transcoded: "${next.title}"`);
 						done();
 					});
 				});
+			} else if (isCancelled(db, next.id)) {
+				cleanupTemp(tempOutput);
+				console.log(`[transcoder] Cancelled: "${next.title}"`);
+				setTimeout(done, 1000);
 			} else if (hwAccel !== 'none') {
 				console.warn(`[transcoder] VAAPI failed for "${next.title}", retrying with software`);
-				const swArgs = buildVideoArgs(next.original_path, outputPath, 'none');
+				cleanupTemp(tempOutput);
+				const swArgs = buildVideoArgs(next.original_path, tempOutput, 'none');
 				db.prepare("UPDATE media SET transcode_progress = 0 WHERE id = ?").run(next.id);
 				runFfmpeg(swArgs, db, next.id, totalDuration, (swCode) => {
 					if (swCode === 0) {
 						generateThumbnail(next.original_path, thumbPath, totalDuration, () => {
-							finishMedia(db, next.id, outputPath, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
+							finishMedia(db, next.id, tempOutput, finalOutput, next.original_path, mediaPath, originalsPath, thumbPath, totalDuration, () => {
 								console.log(`[transcoder] Transcoded (software fallback): "${next.title}"`);
 								done();
 							});
 						});
 					} else if (!isCancelled(db, next.id)) {
+						cleanupTemp(tempOutput);
 						db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 						console.error(`[transcoder] Failed: "${next.title}"`);
 						setTimeout(done, 4000);
 					} else {
+						cleanupTemp(tempOutput);
 						console.log(`[transcoder] Cancelled: "${next.title}"`);
 						setTimeout(done, 1000);
 					}
 				});
-			} else if (!isCancelled(db, next.id)) {
+			} else {
+				cleanupTemp(tempOutput);
 				db.prepare("UPDATE media SET transcode_status = 'failed', updated_at = datetime('now') WHERE id = ?").run(next.id);
 				console.error(`[transcoder] Failed: "${next.title}"`);
 				setTimeout(done, 4000);
-			} else {
-				console.log(`[transcoder] Cancelled: "${next.title}"`);
-				setTimeout(done, 1000);
 			}
 		});
 	}

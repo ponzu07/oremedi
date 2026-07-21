@@ -63,6 +63,57 @@ function createPlayerStore() {
 	let videoBindResolve: (() => void) | null = null;
 	let videoReady = false;
 	let currentBlobUrl: string | null = null;
+	let stalledTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearStalledTimer() {
+		if (stalledTimer) {
+			clearTimeout(stalledTimer);
+			stalledTimer = null;
+		}
+	}
+
+	// --- Media Session API (lockscreen / notification controls + metadata) ---
+	let mediaSessionReady = false;
+	function hasMediaSession(): boolean {
+		return typeof navigator !== 'undefined' && 'mediaSession' in navigator;
+	}
+	function setupMediaSession() {
+		if (mediaSessionReady || !hasMediaSession()) return;
+		mediaSessionReady = true;
+		const ms = navigator.mediaSession;
+		try {
+			ms.setActionHandler('play', () => togglePlayPause());
+			ms.setActionHandler('pause', () => togglePlayPause());
+			ms.setActionHandler('previoustrack', () => previous());
+			ms.setActionHandler('nexttrack', () => next());
+			ms.setActionHandler('seekbackward', (d) => skipBackward(d.seekOffset || 15));
+			ms.setActionHandler('seekforward', (d) => skipForward(d.seekOffset || 30));
+			ms.setActionHandler('seekto', (d) => { if (d.seekTime != null) seek(d.seekTime); });
+		} catch { /* some handlers unsupported — ignore */ }
+	}
+	function updateMediaSessionMetadata(item: QueueItem) {
+		if (!hasMediaSession()) return;
+		const artwork = item.thumbnailPath
+			? [{ src: `/api/media/${item.mediaId}/thumbnail`, sizes: '512x512', type: 'image/jpeg' }]
+			: [];
+		navigator.mediaSession.metadata = new MediaMetadata({
+			title: item.title,
+			artist: 'OreMedi',
+			artwork
+		});
+	}
+	function updatePositionState() {
+		if (!hasMediaSession() || typeof navigator.mediaSession.setPositionState !== 'function') return;
+		const { duration, currentTime, playbackRate } = state;
+		if (!isFinite(duration) || duration <= 0) return;
+		try {
+			navigator.mediaSession.setPositionState({
+				duration,
+				position: Math.min(currentTime, duration),
+				playbackRate
+			});
+		} catch { /* invalid state — ignore */ }
+	}
 
 	function getActiveElement(): HTMLAudioElement | HTMLVideoElement | null {
 		return isVideoCategory(state.category) ? videoElement : audioElement;
@@ -72,19 +123,29 @@ function createPlayerStore() {
 		const guard = () => isVideo === isVideoCategory(state.category);
 
 		el.addEventListener('timeupdate', () => {
-			if (guard()) state.currentTime = el.currentTime;
+			if (guard()) {
+				state.currentTime = el.currentTime;
+				updatePositionState();
+			}
 		});
 		el.addEventListener('durationchange', () => {
-			if (guard()) state.duration = el.duration;
+			if (guard()) {
+				state.duration = el.duration;
+				updatePositionState();
+			}
 		});
 		el.addEventListener('play', () => {
 			if (guard()) {
 				state.isPlaying = true;
 				state.error = null;
+				if (hasMediaSession()) navigator.mediaSession.playbackState = 'playing';
 			}
 		});
 		el.addEventListener('pause', () => {
-			if (guard()) state.isPlaying = false;
+			if (guard()) {
+				state.isPlaying = false;
+				if (hasMediaSession()) navigator.mediaSession.playbackState = 'paused';
+			}
 		});
 		el.addEventListener('ended', () => {
 			if (guard()) next();
@@ -96,10 +157,14 @@ function createPlayerStore() {
 			if (guard()) {
 				state.isBuffering = false;
 				state.error = null;
+				clearStalledTimer();
 			}
 		});
 		el.addEventListener('canplay', () => {
-			if (guard()) state.isBuffering = false;
+			if (guard()) {
+				state.isBuffering = false;
+				clearStalledTimer();
+			}
 		});
 		el.addEventListener('error', () => {
 			if (!guard()) return;
@@ -121,9 +186,13 @@ function createPlayerStore() {
 		el.addEventListener('stalled', () => {
 			if (!guard()) return;
 			state.isBuffering = true;
-			// stalled状態が長く続いたらエラーとして扱う
-			setTimeout(() => {
-				if (guard() && el.readyState < 3 && !el.paused) {
+			// stalled状態が長く続いたらエラーとして扱う（タイマーは1本に集約し、
+			// 発火時に同じトラックを再生中かを確認して古いリロードを防ぐ）
+			clearStalledTimer();
+			const stalledMediaId = state.mediaId;
+			stalledTimer = setTimeout(() => {
+				stalledTimer = null;
+				if (guard() && state.mediaId === stalledMediaId && el.readyState < 3 && !el.paused) {
 					state.error = 'バッファリングがタイムアウトしました';
 					handlePlaybackError();
 				}
@@ -162,6 +231,7 @@ function createPlayerStore() {
 	 */
 	async function loadAndPlay(item: QueueItem, forceStream = false) {
 		revokePreviousBlobUrl();
+		clearStalledTimer();
 
 		let url = `/api/media/${item.mediaId}/stream`;
 		let offline = false;
@@ -190,6 +260,9 @@ function createPlayerStore() {
 		state.error = null;
 		state.currentTime = 0;
 		state.duration = 0;
+
+		setupMediaSession();
+		updateMediaSessionMetadata(item);
 
 		const isVideo = isVideoCategory(item.category);
 
@@ -266,7 +339,13 @@ function createPlayerStore() {
 		if (!item) return;
 
 		if (state.isOffline) {
-			// キャッシュ再生で失敗 → ストリーミングにフォールバック
+			// キャッシュ再生で失敗。オフライン中はストリーミングに切り替えても無駄で、
+			// 有効なローカルコピーを捨てるだけなのでエラー表示に留める。
+			if (typeof navigator !== 'undefined' && !navigator.onLine) {
+				state.error = 'オフラインのため再生できません。接続後に再試行してください';
+				return;
+			}
+			// オンラインならストリーミングにフォールバック
 			state.error = 'キャッシュ再生に失敗。ストリーミングで再試行中…';
 			retryCount = 0;
 			setTimeout(() => loadAndPlay(item, true), 500);
@@ -352,9 +431,10 @@ function createPlayerStore() {
 			if (pos < state.shuffleOrder.length - 1) {
 				nextIndex = state.shuffleOrder[pos + 1];
 			} else if (state.repeatMode === 'all') {
-				// Re-shuffle and wrap
+				// Re-shuffle and wrap. generateShuffleOrder puts the current track at
+				// position 0, so start from position 1 to avoid replaying it.
 				state.shuffleOrder = generateShuffleOrder(state.queue.length, state.currentIndex);
-				nextIndex = state.shuffleOrder[0];
+				nextIndex = state.shuffleOrder.length > 1 ? state.shuffleOrder[1] : state.shuffleOrder[0];
 			} else {
 				state.isPlaying = false;
 				return;
