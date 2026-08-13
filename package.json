@@ -24,7 +24,7 @@
 		"@tailwindcss/vite": "^4.2.2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/jsonwebtoken": "^9.0.10",
-		"daisyui": "^5.5.19",
+		"daisyui": "^5.7.16",
 		"husky": "^9.1.7",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
